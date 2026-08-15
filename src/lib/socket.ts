@@ -1,6 +1,11 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const configuredSocketUrl = import.meta.env.VITE_API_URL?.trim();
+const SOCKET_URL = configuredSocketUrl || (import.meta.env.DEV ? 'http://localhost:3001' : '');
+
+if (!configuredSocketUrl && import.meta.env.PROD) {
+  console.error('[SOCKET] VITE_API_URL is missing in the production bundle. Configure it with the public HTTPS API origin; realtime connections are disabled until then.');
+}
 let socket: Socket | null = null;
 let publicSocket: Socket | null = null;
 
@@ -8,7 +13,7 @@ export const getSocket = () => socket;
 export const getPublicSocket = () => publicSocket;
 
 export const connectSocket = (memberId: string, token: string) => {
-  if (!token) return null;
+  if (!SOCKET_URL || !token) return null;
   if (!socket) {
     socket = io(SOCKET_URL, {
       auth: { token },
@@ -31,6 +36,7 @@ export const connectSocket = (memberId: string, token: string) => {
 };
 
 export const connectPublicSocket = () => {
+  if (!SOCKET_URL) return null;
   if (!publicSocket) {
     publicSocket = io(SOCKET_URL, {
       withCredentials: true,

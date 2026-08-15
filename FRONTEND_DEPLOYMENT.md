@@ -9,10 +9,10 @@ Configure these variables in the frontend host’s build environment:
 | Variable | Value |
 |---|---|
 | `VITE_NEON_AUTH_URL` | The Neon Auth URL for the target branch, such as `https://<neon-auth-host>/neondb/auth` |
-| `VITE_API_URL` | The public HTTPS origin of the deployed API, with no trailing path required |
+| `VITE_API_URL` | The public HTTPS origin of the deployed API, with no trailing path required. This is intentionally browser-visible configuration, not a secret. |
 | `VITE_PAYSTACK_PUBLIC_KEY` | Paystack’s public key for the target environment |
 
-Do not configure `PAYSTACK_SECRET_KEY`, `DATABASE_URL`, `NEON_AUTH_API_KEY`, or any other server-only secret in the frontend host.
+Do not rename `VITE_API_URL` to `API_URL`: Vite only exposes variables prefixed with `VITE_` to browser code, and the API origin is not a secret. Do not configure `PAYSTACK_SECRET_KEY`, `DATABASE_URL`, `NEON_AUTH_API_KEY`, or any other server-only secret in the frontend host.
 
 ## API configuration
 
