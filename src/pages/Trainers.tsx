@@ -1,139 +1,48 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Star, CalendarDays, ArrowRight, Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowRight, BadgeCheck, CalendarDays, CheckCircle2, Clock3, MapPin, Search, Star, X } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { api } from "@/lib/db";
+import { useAuth } from "@/contexts/AuthContext";
 
-const categories = ["All", "Strength & Conditioning", "Yoga & Flexibility", "HIIT & Cardio", "Nutrition", "Rehabilitation"];
-
-const trainerData = [
-  { name: "Sarah Jenkins", role: "Senior Coach", specialty: "Strength", rating: 4.9, desc: "Specializes in powerlifting and functional hypertrophy. I help you build strength that translates to real life performance and confidence.", color: "from-red-500/20 to-red-500/5" },
-  { name: "Mike Ross", role: "Conditioning Specialist", specialty: "HIIT", rating: 4.8, desc: "High energy interval training designed for maximum fat loss and endurance. Get ready to sweat and push your limits.", color: "from-orange-500/20 to-orange-500/5" },
-  { name: "Elena Rodriguez", role: "Mindfulness Expert", specialty: "Yoga", rating: 5.0, desc: "Integrating mindfulness and flexibility to improve your overall wellbeing. Focus on breath, balance, and inner peace.", color: "from-teal-500/20 to-teal-500/5" },
-  { name: "David Chen", role: "Certified Dietitian", specialty: "Nutrition", rating: 4.9, desc: "Fuel your body right. I provide personalized meal plans and nutritional advice focusing on performance and recovery.", color: "from-primary/20 to-primary/5" },
-  { name: "Marcus Johnson", role: "Physical Therapist", specialty: "Rehab", rating: 5.0, desc: "Recover faster and stronger. My rehabilitation programs are science-based to get you back to peak performance safely.", color: "from-blue-500/20 to-blue-500/5" },
-  { name: "Alicia Keys", role: "Boxing Coach", specialty: "Boxing", rating: 4.7, desc: "Learn self-defense and improve your cardiovascular health. Boxing is a fun and intense way to get in shape quickly.", color: "from-pink-500/20 to-pink-500/5" },
-];
-
-const fade = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.4 } }),
-};
+const initials = (name: string) => name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+const dateLabel = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Schedule TBC' : `${date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`; };
+const gradientFor = (index: number) => ['from-rose-500/25 via-orange-500/10 to-transparent', 'from-primary/25 via-cyan-500/10 to-transparent', 'from-violet-500/25 via-fuchsia-500/10 to-transparent', 'from-emerald-500/25 via-teal-500/10 to-transparent'][index % 4];
 
 const Trainers = () => {
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [search, setSearch] = useState("");
+  const navigate = useNavigate();
+  const { user, isSignedIn } = useAuth();
+  const { data: trainers = [], isLoading: trainersLoading } = useQuery({ queryKey: ['instructors'], queryFn: () => api.classes.getInstructors(), staleTime: 60_000 });
+  const { data: classes = [] } = useQuery({ queryKey: ['classes'], queryFn: api.classes.getAll, staleTime: 30_000 });
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [search, setSearch] = useState('');
+  const [selectedTrainer, setSelectedTrainer] = useState<any | null>(null);
 
-  const filtered = trainerData.filter((t) => {
-    const matchesSearch = t.name.toLowerCase().includes(search.toLowerCase()) || t.specialty.toLowerCase().includes(search.toLowerCase());
-    return matchesSearch;
-  });
+  const categories = useMemo(() => ['All', ...Array.from(new Set((trainers as any[]).map((trainer) => trainer.specialty).filter(Boolean)))], [trainers]);
+  const filtered = useMemo(() => (trainers as any[]).filter((trainer) => {
+    const needle = search.toLowerCase();
+    return (activeCategory === 'All' || trainer.specialty === activeCategory) && (!needle || `${trainer.fullName} ${trainer.specialty} ${trainer.bio}`.toLowerCase().includes(needle));
+  }), [trainers, activeCategory, search]);
+  const selectedClasses = useMemo(() => selectedTrainer ? (classes as any[]).filter((item) => item.instructorId === selectedTrainer.id || item.instructor === selectedTrainer.fullName).filter((item) => new Date(item.schedule).getTime() > Date.now()).slice(0, 5) : [], [classes, selectedTrainer]);
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
-      <div className="pt-16">
-        {/* Header */}
-        <section className="border-b border-border py-16">
-          <div className="container mx-auto px-4 md:px-6">
-            <h1 className="text-4xl font-bold text-foreground md:text-5xl">
-              Meet Our <span className="text-gradient">Expert Trainers</span>
-            </h1>
-            <p className="mt-3 max-w-lg text-muted-foreground">
-              Achieve your fitness goals with our world-class coaching staff. Our trainers are certified professionals dedicated to helping you unlock your full potential.
-            </p>
+  const book = (classId: string) => {
+    const redirect = `/dashboard/classes?classId=${encodeURIComponent(classId)}`;
+    if (!isSignedIn) return navigate(`/auth/sign-up?redirect=${encodeURIComponent(redirect)}`);
+    if (!user || user.membershipStatus !== 'active' || user.plan === 'free') return navigate('/pricing');
+    navigate(redirect);
+  };
 
-            {/* Search */}
-            <div className="mt-6 relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search trainers..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-border bg-card py-2.5 pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
+  return <div className="min-h-screen bg-background"><Navbar /><div className="pt-16"><section className="relative overflow-hidden border-b border-border py-16 md:py-20"><div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/10 blur-3xl" /><div className="container relative mx-auto px-4 md:px-6"><div className="max-w-3xl"><div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary"><BadgeCheck className="h-3.5 w-3.5" /> Coaches who care</div><h1 className="text-4xl font-bold tracking-tight text-foreground md:text-6xl">Meet the people behind your <span className="text-gradient">progress.</span></h1><p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">Find a coach whose expertise fits your goals, then choose a live class that makes taking the next step feel easy.</p></div><div className="mt-8 flex max-w-2xl flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><input type="search" placeholder="Search by name, specialty, or goal…" value={search} onChange={(event) => setSearch(event.target.value)} className="w-full rounded-xl border border-border bg-card py-3 pl-10 pr-4 text-sm text-foreground outline-none focus:border-primary" /></div><div className="flex items-center gap-2 overflow-x-auto">{categories.map((category) => <button key={category} onClick={() => setActiveCategory(category)} className={`shrink-0 rounded-xl px-4 py-3 text-xs font-semibold transition ${activeCategory === category ? 'bg-primary text-primary-foreground' : 'border border-border bg-card text-muted-foreground hover:text-foreground'}`}>{category}</button>)}</div></div></div></section>
 
-            {/* Category filters */}
-            <div className="mt-6 flex flex-wrap gap-2">
-              {categories.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setActiveCategory(c)}
-                  className={`rounded-lg px-4 py-2 text-xs font-medium transition-all ${
-                    activeCategory === c
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
+<section className="py-14 md:py-16"><div className="container mx-auto px-4 md:px-6"><div className="mb-8 flex items-end justify-between"><div><p className="text-sm text-muted-foreground">{trainersLoading ? 'Loading coaches…' : `${filtered.length} coach${filtered.length === 1 ? '' : 'es'} available`}</p><h2 className="mt-1 text-2xl font-bold text-foreground">Your coaching roster</h2></div><div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex"><CheckCircle2 className="h-4 w-4 text-primary" /> Live profiles from the gym</div></div>{trainersLoading ? <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="h-96 animate-pulse rounded-2xl border border-border bg-card" />)}</div> : filtered.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-12 text-center"><p className="font-semibold text-foreground">No coaches match your search.</p><p className="mt-1 text-sm text-muted-foreground">Try a different specialty or search term.</p></div> : <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{filtered.map((trainer: any, index: number) => { const name = trainer.fullName || 'OptizGYM coach'; return <motion.article key={trainer.id} initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: index * .06 }} className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl"><div className={`relative flex h-52 items-center justify-center overflow-hidden bg-gradient-to-br ${gradientFor(index)}`}><div className="absolute -right-10 -top-12 h-40 w-40 rounded-full border border-white/10" /><div className="absolute -bottom-16 -left-10 h-48 w-48 rounded-full border border-white/10" />{trainer.avatarUrl ? <img src={trainer.avatarUrl} alt={name} className="relative h-28 w-28 rounded-full border-4 border-background/70 object-cover shadow-2xl" /> : <div className="relative flex h-28 w-28 items-center justify-center rounded-full border-4 border-background/70 bg-background/80 text-3xl font-bold text-primary shadow-2xl">{initials(name)}</div>}<div className="absolute right-4 top-4 flex items-center gap-1 rounded-full bg-background/80 px-2.5 py-1 backdrop-blur"><Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" /><span className="text-xs font-bold text-foreground">4.9</span></div></div><div className="p-6"><div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-bold text-foreground">{name}</h3><p className="mt-1 text-sm font-semibold text-primary">{trainer.specialty || 'Performance coach'}</p></div><BadgeCheck className="h-5 w-5 shrink-0 text-primary" /></div><p className="mt-4 line-clamp-3 text-sm leading-6 text-muted-foreground">{trainer.bio || 'A thoughtful, practical coach here to help you train consistently and make progress you can feel.'}</p><button onClick={() => setSelectedTrainer(trainer)} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 py-3 text-sm font-bold text-foreground transition hover:bg-primary hover:text-primary-foreground"><CalendarDays className="h-4 w-4" /> Book a session <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></button></div></motion.article>; })}</div>}</div></section>
 
-        {/* Trainers Grid */}
-        <section className="py-16">
-          <div className="container mx-auto px-4 md:px-6">
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((t, i) => (
-                <motion.div
-                  key={t.name}
-                  custom={i}
-                  initial="hidden"
-                  whileInView="visible"
-                  viewport={{ once: true }}
-                  variants={fade}
-                  className="group rounded-xl border border-border bg-card overflow-hidden card-hover"
-                >
-                  <div className={`h-48 bg-gradient-to-br ${t.color} flex items-center justify-center relative`}>
-                    <span className="text-5xl font-bold text-foreground/20">{t.name.charAt(0)}</span>
-                    <div className="absolute top-4 right-4 flex items-center gap-1 rounded-full bg-background/80 backdrop-blur-sm px-2.5 py-1">
-                      <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
-                      <span className="text-xs font-semibold text-foreground">{t.rating}</span>
-                    </div>
-                    <span className="absolute top-4 left-4 rounded-md bg-background/80 backdrop-blur-sm px-2.5 py-1 text-xs font-medium text-foreground">
-                      {t.specialty}
-                    </span>
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-lg font-semibold text-foreground">{t.name}</h3>
-                    <p className="text-sm text-primary">{t.role}</p>
-                    <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{t.desc}</p>
-                    <button className="mt-4 flex items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-all hover:bg-primary hover:text-primary-foreground">
-                      <CalendarDays className="h-4 w-4" /> Book Session
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </section>
+<section className="border-t border-border py-20"><div className="container mx-auto px-4 text-center md:px-6"><div className="mx-auto max-w-xl"><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">A little guidance goes a long way</p><h2 className="mt-3 text-3xl font-bold text-foreground">Not sure who to choose?</h2><p className="mx-auto mt-3 max-w-md text-muted-foreground">Create your profile and we’ll help you find a coach whose style, schedule, and specialty fit your goals.</p><div className="mt-8 flex flex-wrap items-center justify-center gap-4"><Link to="/auth/sign-up" className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110">Get a free match</Link><Link to="/pricing" className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition hover:text-primary">Explore memberships <ArrowRight className="h-4 w-4" /></Link></div></div></div></section></div><Footer />
 
-        {/* CTA */}
-        <section className="border-t border-border py-24">
-          <div className="container mx-auto px-4 text-center md:px-6">
-            <h2 className="text-3xl font-bold text-foreground">Not sure who to choose?</h2>
-            <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-              Schedule a free 15-minute consultation with our head coach. We'll discuss your goals and match you with the perfect trainer.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-              <button className="rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:brightness-110">
-                Get a Free Match
-              </button>
-              <Link to="/pricing" className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-                Explore Memberships <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </div>
-        </section>
-      </div>
-      <Footer />
-    </div>
-  );
+{selectedTrainer && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true"><button aria-label="Close booking dialog" onClick={() => setSelectedTrainer(null)} className="absolute inset-0 cursor-default" /><motion.div initial={{ opacity: 0, y: 16, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl"><button onClick={() => setSelectedTrainer(null)} className="absolute right-4 top-4 rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"><X className="h-4 w-4" /></button><div className="flex items-center gap-4 pr-8"><div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/15 text-xl font-bold text-primary">{selectedTrainer.avatarUrl ? <img src={selectedTrainer.avatarUrl} alt={selectedTrainer.fullName} className="h-full w-full rounded-full object-cover" /> : initials(selectedTrainer.fullName || 'Coach')}</div><div><p className="text-xl font-bold text-foreground">Book with {selectedTrainer.fullName}</p><p className="mt-1 text-sm text-primary">{selectedTrainer.specialty || 'Performance coach'}</p></div></div><div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4"><p className="text-sm font-semibold text-foreground">Choose an upcoming class</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Your booking will open in the member dashboard, where you can confirm availability and payment status.</p></div><div className="mt-5 space-y-3">{selectedClasses.length === 0 ? <div className="rounded-xl border border-dashed border-border p-6 text-center"><p className="text-sm font-semibold text-foreground">No upcoming classes found</p><p className="mt-1 text-xs text-muted-foreground">Check back soon or explore the full schedule.</p><Link to="/classes" onClick={() => setSelectedTrainer(null)} className="mt-4 inline-flex rounded-lg bg-secondary px-4 py-2 text-xs font-semibold text-foreground">View all classes</Link></div> : selectedClasses.map((item: any) => <div key={item.id} className="flex items-center justify-between gap-4 rounded-xl border border-border bg-background/60 p-4"><div className="min-w-0"><p className="truncate text-sm font-semibold text-foreground">{item.name}</p><div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground"><span className="inline-flex items-center gap-1"><CalendarDays className="h-3 w-3" />{dateLabel(item.schedule)}</span><span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />{item.durationMinutes || 45} min</span><span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{item.location || 'Main studio'}</span></div></div><button onClick={() => book(item.id)} className="shrink-0 rounded-lg bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:brightness-110">Book</button></div>)}</div></motion.div></div>}
+</div>;
 };
 
 export default Trainers;

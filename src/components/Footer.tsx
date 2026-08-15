@@ -9,7 +9,7 @@ const Footer = () => (
         <div className="space-y-4">
           <Link to="/" className="flex items-center gap-2">
             <Dumbbell className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold text-foreground">OptiBiz Gym</span>
+            <span className="text-lg font-bold text-foreground">OptizGYM</span>
           </Link>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Empowering individuals to reach their peak potential through expert guidance and premium facilities.
@@ -50,14 +50,14 @@ const Footer = () => (
             </div>
             <div className="flex items-center gap-2">
               <Mail className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">hello@optibizgym.com</span>
+              <span className="text-sm text-muted-foreground">hello@optizgym.com</span>
             </div>
           </div>
         </div>
       </div>
 
       <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
-        <p className="text-xs text-muted-foreground">© 2024 OptiBiz Gym. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">© 2026 OptizGYM. All rights reserved.</p>
         <div className="flex gap-6">
           {["Privacy", "Terms", "Cookies"].map((item) => (
             <span key={item} className="text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors">{item}</span>

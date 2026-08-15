@@ -1,267 +1,56 @@
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Play, CheckCircle, Dumbbell, Timer, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle, Clock3, Dumbbell, MapPin, Play, Sparkles, Timer, UserRound, Users } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import heroImg from "@/assets/hero-gym.jpg";
+import { api } from "@/lib/db";
+import { connectPublicSocket } from "@/lib/socket";
+import { toast } from "sonner";
 
-const stats = [
-  { value: "2500+", label: "Active Members" },
-  { value: "50+", label: "Expert Trainers" },
-  { value: "100+", label: "Weekly Classes" },
-  { value: "24/7", label: "Gym Access" },
-];
-
-const programs = [
-  {
-    icon: Users,
-    title: "Yoga & Flexibility",
-    desc: "Improve your range of motion, mental focus, and core stability with our expert-led yoga sessions.",
-    color: "from-teal-500/20 to-teal-500/5",
-  },
-  {
-    icon: Timer,
-    title: "HIIT Cardio",
-    desc: "High-intensity interval training designed to burn fat, boost endurance, and push your limits.",
-    color: "from-orange-500/20 to-orange-500/5",
-  },
-  {
-    icon: Dumbbell,
-    title: "Strength Training",
-    desc: "Build muscle and raw power with compound movements and specialized strength equipment.",
-    color: "from-primary/20 to-primary/5",
-  },
-];
-
-const trainers = [
-  { name: "Alex Johnson", role: "Strength Coach" },
-  { name: "Sarah Miller", role: "Yoga Specialist" },
-  { name: "Mike Ross", role: "CrossFit Expert" },
-  { name: "Emily Chen", role: "Nutritionist" },
-];
-
-const fade = {
-  hidden: { opacity: 0, y: 30 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.5 },
-  }),
-};
+const stats = [{ value: "2500+", label: "Active Members" }, { value: "50+", label: "Expert Trainers" }, { value: "100+", label: "Weekly Classes" }, { value: "24/7", label: "Gym Access" }];
+const fade = { hidden: { opacity: 0, y: 30 }, visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5 } }) };
+const initials = (name: string) => name.split(' ').map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+const scheduleLabel = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? 'Schedule TBC' : `${date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`; };
 
 const Index = () => {
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar />
+  const queryClient = useQueryClient();
+  const [newClassName, setNewClassName] = useState<string | null>(null);
+  const { data: classes = [], isLoading: classesLoading, isError: classesError } = useQuery({ queryKey: ['classes'], queryFn: api.classes.getAll, staleTime: 30_000 });
+  const { data: trainers = [], isLoading: trainersLoading, isError: trainersError } = useQuery({ queryKey: ['instructors'], queryFn: () => api.classes.getInstructors(), staleTime: 60_000 });
 
-      {/* Hero */}
-      <section className="relative flex min-h-screen items-center overflow-hidden pt-16">
-        <div className="absolute inset-0">
-          <img src={heroImg} alt="OptiBiz Gym interior" className="h-full w-full object-cover opacity-40" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" />
-        </div>
-        <div className="container relative z-10 mx-auto px-4 md:px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7 }}
-            className="max-w-2xl space-y-6"
-          >
-            <span className="inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary">
-              New Equipment Arrived
-            </span>
-            <h1 className="text-5xl font-extrabold leading-tight text-foreground md:text-7xl">
-              Elevate Your{" "}
-              <span className="text-gradient">Performance</span>
-            </h1>
-            <p className="max-w-lg text-lg text-muted-foreground">
-              State-of-the-art equipment, world-class trainers, and a community dedicated to helping you smash your fitness goals.
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Link
-                to="/pricing"
-                className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:brightness-110"
-              >
-                Start Free Trial <ArrowRight className="h-4 w-4" />
-              </Link>
-              <button className="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-medium text-foreground transition-all hover:border-primary/50">
-                <Play className="h-4 w-4 text-primary" /> Watch Video
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+  useEffect(() => {
+    const socket = connectPublicSocket();
+    if (!socket) return;
+    const onCreated = (data: any) => {
+      const name = data?.name || data?.class?.name || 'A new class';
+      setNewClassName(name);
+      toast.success(`New class dropped: ${name}`);
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+    };
+    socket.on('class-created', onCreated);
+    socket.on('class-new', onCreated);
+    return () => { socket.off('class-created', onCreated); socket.off('class-new', onCreated); };
+  }, [queryClient]);
 
-      {/* Stats */}
-      <section className="border-y border-border bg-card/50">
-        <div className="container mx-auto grid grid-cols-2 md:grid-cols-4 divide-x divide-border">
-          {stats.map((s, i) => (
-            <motion.div
-              key={s.label}
-              custom={i}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={fade}
-              className="flex flex-col items-center gap-1 py-8"
-            >
-              <span className="text-2xl font-bold text-primary md:text-3xl">{s.value}</span>
-              <span className="text-xs text-muted-foreground">{s.label}</span>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+  const featuredClasses = (classes as any[]).filter((item) => !item.deletedAt).sort((a, b) => new Date(a.schedule).getTime() - new Date(b.schedule).getTime()).slice(0, 3);
+  const liveTrainers = (trainers as any[]).filter((trainer) => !trainer.deletedAt).slice(0, 4);
 
-      {/* Programs */}
-      <section className="py-24">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="mb-12 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
-            <div>
-              <h2 className="text-3xl font-bold text-foreground md:text-4xl">Our Programs</h2>
-              <p className="mt-2 max-w-xl text-muted-foreground">
-                Designed for all fitness levels, our programs combine science-based training with high-energy environments.
-              </p>
-            </div>
-            <Link to="/classes" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-              View All Classes <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {programs.map((p, i) => (
-              <motion.div
-                key={p.title}
-                custom={i}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fade}
-                className="group rounded-xl border border-border bg-card p-8 card-hover"
-              >
-                <div className={`mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br ${p.color}`}>
-                  <p.icon className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="mb-3 text-xl font-semibold text-foreground">{p.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{p.desc}</p>
-                <button className="mt-6 flex items-center gap-1 text-sm font-medium text-primary transition-all group-hover:gap-2">
-                  Learn More <ArrowRight className="h-4 w-4" />
-                </button>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+  return <div className="min-h-screen bg-background"><Navbar />
+    <section className="relative flex min-h-screen items-center overflow-hidden pt-16"><div className="absolute inset-0"><img src={heroImg} alt="OptizGYM interior" className="h-full w-full object-cover opacity-40" /><div className="absolute inset-0 bg-gradient-to-r from-background via-background/80 to-transparent" /></div><div className="container relative z-10 mx-auto px-4 md:px-6"><motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .7 }} className="max-w-2xl space-y-6"><span className="inline-block rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary">New Equipment Arrived</span><h1 className="text-5xl font-extrabold leading-tight text-foreground md:text-7xl">Elevate Your <span className="text-gradient">Performance</span></h1><p className="max-w-lg text-lg text-muted-foreground">State-of-the-art equipment, world-class trainers, and a community dedicated to helping you smash your fitness goals.</p><div className="flex flex-wrap gap-4"><Link to="/auth/sign-up" className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-all hover:brightness-110">Start Free Trial <ArrowRight className="h-4 w-4" /></Link><Link to="/classes" className="inline-flex items-center gap-2 rounded-lg border border-border px-6 py-3 text-sm font-medium text-foreground transition-all hover:border-primary/50"><Play className="h-4 w-4 text-primary" /> View Classes</Link></div></motion.div></div></section>
 
-      {/* Trainers Preview */}
-      <section className="border-t border-border bg-card/30 py-24">
-        <div className="container mx-auto px-4 md:px-6">
-          <h2 className="text-3xl font-bold text-foreground md:text-4xl">Expert Trainers</h2>
-          <p className="mt-2 mb-12 max-w-xl text-muted-foreground">
-            Our certified personal trainers are here to guide, motivate, and help you achieve results you never thought possible.
-          </p>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {trainers.map((t, i) => (
-              <motion.div
-                key={t.name}
-                custom={i}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fade}
-                className="group rounded-xl border border-border bg-card p-6 text-center card-hover"
-              >
-                <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/5">
-                  <span className="text-2xl font-bold text-primary">{t.name.charAt(0)}</span>
-                </div>
-                <h3 className="font-semibold text-foreground">{t.name}</h3>
-                <p className="text-sm text-muted-foreground">{t.role}</p>
-              </motion.div>
-            ))}
-          </div>
-          <div className="mt-8 text-center">
-            <Link to="/trainers" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-              View All Trainers <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </div>
-      </section>
+    <section className="border-y border-border bg-card/50"><div className="container mx-auto grid grid-cols-2 divide-x divide-border md:grid-cols-4">{stats.map((stat, i) => <motion.div key={stat.label} custom={i} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fade} className="flex flex-col items-center gap-1 py-8"><span className="text-2xl font-bold text-primary md:text-3xl">{stat.value}</span><span className="text-xs text-muted-foreground">{stat.label}</span></motion.div>)}</div></section>
 
-      {/* Pricing Preview */}
-      <section className="py-24">
-        <div className="container mx-auto px-4 md:px-6">
-          <div className="mb-12 text-center">
-            <h2 className="text-3xl font-bold text-foreground md:text-4xl">Membership Plans</h2>
-            <p className="mt-2 text-muted-foreground">Choose the plan that best fits your lifestyle. No hidden fees, cancel anytime.</p>
-          </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {[
-              { name: "Basic", price: "$29", features: ["Gym access (Off-peak hours)", "Standard Equipment", "Locker room access"] },
-              { name: "Pro", price: "$59", popular: true, features: ["24/7 Unlimited Access", "All Group Classes Included", "Free Guest Pass (1/mo)", "Sauna & Steam Room"] },
-              { name: "Elite", price: "$99", features: ["Everything in Pro", "Personal Training (2x/mo)", "Nutrition Plan Consultation", "Private Locker"] },
-            ].map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                custom={i}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fade}
-                className={`relative rounded-xl border bg-card p-8 card-hover ${
-                  plan.popular ? "border-primary glow-primary" : "border-border"
-                }`}
-              >
-                {plan.popular && (
-                  <span className="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                    Most Popular
-                  </span>
-                )}
-                <h3 className="text-xl font-semibold text-foreground">{plan.name}</h3>
-                <div className="mt-4 mb-6">
-                  <span className="text-4xl font-bold text-foreground">{plan.price}</span>
-                  <span className="text-muted-foreground">/mo</span>
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <CheckCircle className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Link
-                  to="/pricing"
-                  className={`block w-full rounded-lg py-3 text-center text-sm font-semibold transition-all ${
-                    plan.popular
-                      ? "bg-primary text-primary-foreground hover:brightness-110"
-                      : "border border-border text-foreground hover:border-primary/50"
-                  }`}
-                >
-                  Choose {plan.name}
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+    <section className="py-24"><div className="container mx-auto px-4 md:px-6">{newClassName && <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-8 flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-start gap-3"><div className="rounded-xl bg-primary p-2 text-primary-foreground"><Sparkles className="h-5 w-5" /></div><div><p className="text-sm font-bold text-primary">New class dropped</p><p className="mt-1 text-sm text-foreground"><span className="font-semibold">{newClassName}</span> is now on the live schedule.</p></div></div><Link to="/classes" className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">See details <ArrowRight className="h-4 w-4" /></Link></motion.div>}<div className="mb-12 flex flex-col items-start justify-between gap-4 md:flex-row md:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">Train in the now</p><h2 className="mt-2 text-3xl font-bold text-foreground md:text-4xl">Live classes, ready when you are</h2><p className="mt-2 max-w-xl text-muted-foreground">Browse the latest sessions from the OptizGYM team. Every card is connected to the live schedule, so you always see what is actually available.</p></div><Link to="/classes" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">View all classes <ArrowRight className="h-4 w-4" /></Link></div>{classesLoading ? <div className="grid gap-6 md:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="h-64 animate-pulse rounded-2xl border border-border bg-card" />)}</div> : classesError ? <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-10 text-center"><p className="font-semibold text-foreground">Classes are temporarily unavailable.</p><p className="mt-1 text-sm text-muted-foreground">Please try the public Classes page again in a moment.</p><Link to="/classes" className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline">Open Classes <ArrowRight className="ml-1 h-4 w-4" /></Link></div> : featuredClasses.length === 0 ? <div className="rounded-2xl border border-dashed border-border p-10 text-center"><CalendarDays className="mx-auto h-8 w-8 text-muted-foreground" /><p className="mt-3 font-semibold text-foreground">The next schedule is being prepared.</p><p className="mt-1 text-sm text-muted-foreground">Check back soon for fresh sessions.</p></div> : <div className="grid gap-6 md:grid-cols-3">{featuredClasses.map((item: any, index: number) => <motion.article key={item.id} custom={index} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fade} className="group rounded-2xl border border-border bg-card p-6 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-xl"><div className="flex items-start justify-between gap-3"><div className="rounded-xl bg-primary/10 p-3 text-primary"><Dumbbell className="h-5 w-5" /></div><span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">{item.category || 'Training'}</span></div><h3 className="mt-5 text-xl font-bold text-foreground">{item.name}</h3><div className="mt-3 space-y-2 text-xs text-muted-foreground"><p className="flex items-center gap-2"><CalendarDays className="h-3.5 w-3.5 text-primary" />{scheduleLabel(item.schedule)}</p><p className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-primary" />{item.durationMinutes || 45} min · {item.intensity || 'Medium'} intensity</p><p className="flex items-center gap-2"><UserRound className="h-3.5 w-3.5 text-primary" />with {item.instructor || item.instructorLegacy || 'OptizGYM coach'}</p><p className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-primary" />{item.location || 'Main studio'}</p></div><Link to={`/classes`} className="mt-6 inline-flex items-center gap-1 text-sm font-semibold text-primary transition group-hover:gap-2">View class details <ArrowRight className="h-4 w-4" /></Link></motion.article>)}</div>}</div></section>
 
-      {/* CTA */}
-      <section className="border-t border-border bg-gradient-to-br from-primary/10 via-background to-background py-24">
-        <div className="container mx-auto px-4 text-center md:px-6">
-          <h2 className="text-3xl font-bold text-foreground md:text-4xl">Ready to transform your life?</h2>
-          <p className="mx-auto mt-4 max-w-md text-muted-foreground">
-            Join OptiBiz Gym today and get your first week absolutely free.
-          </p>
-          <Link
-            to="/pricing"
-            className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground transition-all hover:brightness-110"
-          >
-            Get Started <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
+    <section className="border-t border-border bg-card/30 py-24"><div className="container mx-auto px-4 md:px-6"><div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end"><div><p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">The people who move you</p><h2 className="mt-2 text-3xl font-bold text-foreground md:text-4xl">Expert trainers</h2><p className="mt-2 max-w-xl text-muted-foreground">Meet the certified coaches who turn good intentions into consistent progress.</p></div><Link to="/trainers" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">Meet the full team <ArrowRight className="h-4 w-4" /></Link></div><div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{trainersLoading ? [1, 2, 3, 4].map((item) => <div key={item} className="h-64 animate-pulse rounded-2xl border border-border bg-card" />) : trainersError ? <div className="col-span-full rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center text-sm text-muted-foreground">Trainer profiles are temporarily unavailable. Please try again shortly.</div> : liveTrainers.length === 0 ? <div className="col-span-full rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Trainer profiles are being prepared.</div> : liveTrainers.map((trainer: any, index: number) => <motion.div key={trainer.id} custom={index} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fade} className="group rounded-2xl border border-border bg-card p-6 text-center transition hover:-translate-y-1 hover:border-primary/40"><div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary/20 to-primary/5">{trainer.avatarUrl ? <img src={trainer.avatarUrl} alt={trainer.fullName} className="h-full w-full object-cover" /> : <span className="text-2xl font-bold text-primary">{initials(trainer.fullName || 'Coach')}</span>}</div><h3 className="font-semibold text-foreground">{trainer.fullName || 'OptizGYM coach'}</h3><p className="text-sm text-primary">{trainer.specialty || 'Performance coach'}</p><p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">{trainer.bio || 'Helping members train with clarity and confidence.'}</p></motion.div>)}</div></div></section>
 
-      <Footer />
-    </div>
-  );
+    <section className="py-24"><div className="container mx-auto px-4 md:px-6"><div className="mb-12 text-center"><h2 className="text-3xl font-bold text-foreground md:text-4xl">Membership Plans</h2><p className="mt-2 text-muted-foreground">Choose the plan that best fits your lifestyle. No hidden fees, cancel anytime.</p></div><div className="grid gap-6 md:grid-cols-3">{[{ name: "Basic", price: "$29", features: ["Gym access (Off-peak hours)", "Standard Equipment", "Locker room access"] }, { name: "Pro", price: "$59", popular: true, features: ["24/7 Unlimited Access", "All Group Classes Included", "Free Guest Pass (1/mo)", "Sauna & Steam Room"] }, { name: "Elite", price: "$99", features: ["Everything in Pro", "Personal Training (2x/mo)", "Nutrition Plan Consultation", "Private Locker"] }].map((plan, i) => <motion.div key={plan.name} custom={i} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fade} className={`relative rounded-xl border bg-card p-8 card-hover ${plan.popular ? "border-primary glow-primary" : "border-border"}`}>{plan.popular && <span className="absolute -top-3 left-6 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Most Popular</span>}<h3 className="text-xl font-semibold text-foreground">{plan.name}</h3><div className="mb-6 mt-4"><span className="text-4xl font-bold text-foreground">{plan.price}</span><span className="text-muted-foreground">/mo</span></div><ul className="mb-8 space-y-3">{plan.features.map((feature) => <li key={feature} className="flex items-start gap-2 text-sm text-muted-foreground"><CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />{feature}</li>)}</ul><Link to="/pricing" className={`block w-full rounded-lg py-3 text-center text-sm font-semibold transition-all ${plan.popular ? "bg-primary text-primary-foreground hover:brightness-110" : "border border-border text-foreground hover:border-primary/50"}`}>Choose {plan.name}</Link></motion.div>)}</div></div></section>
+
+    <section className="border-t border-border bg-gradient-to-br from-primary/10 via-background to-background py-24"><div className="container mx-auto px-4 text-center md:px-6"><h2 className="text-3xl font-bold text-foreground md:text-4xl">Ready to transform your life?</h2><p className="mx-auto mt-4 max-w-md text-muted-foreground">Join OptizGYM today and get your first week absolutely free.</p><Link to="/auth/sign-up" className="mt-8 inline-flex items-center gap-2 rounded-lg bg-primary px-8 py-3.5 text-sm font-semibold text-primary-foreground transition-all hover:brightness-110">Get Started <ArrowRight className="h-4 w-4" /></Link></div></section><Footer />
+  </div>;
 };
 
 export default Index;

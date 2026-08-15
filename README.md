@@ -1,73 +1,86 @@
-# Welcome to your Lovable project
+# OptizGYM — Gym Management Platform
 
-## Project info
+OptizGYM is a full-stack gym management platform built with React, Vite, TypeScript, Tailwind CSS, Express, Drizzle ORM, and Neon PostgreSQL.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- Neon Auth sign-up, email verification, sign-in, password recovery, social providers, and two-factor authentication.
+- Paystack payment integration for membership subscriptions and webhook-driven membership activation.
+- Member dashboard for class booking, payments, workout tracking, and membership status.
+- Admin dashboard for member management, class administration, payments, and reporting.
+- Socket.IO updates for real-time member notifications.
 
-There are several ways of editing your application.
+## Architecture
 
-**Use Lovable**
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS, shadcn/ui, React Router |
+| API | Express 5, TypeScript, Zod, Helmet, CORS, rate limiting |
+| Authentication | Neon Auth with server-side JWT/JWKS verification and signed Neon Auth webhooks |
+| Database | Neon PostgreSQL through `pg` and Drizzle ORM |
+| Payments | Paystack, with server-side webhook signature verification |
+| Realtime | Socket.IO |
+| Deployment | Split topology: frontend deployed separately from the API Docker image |
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+The frontend uses Neon’s prebuilt `AuthView` components. The API does not expose a parallel password-registration or email-token system.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Local Development
 
-**Use your preferred IDE**
+1. Install dependencies:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+   ```bash
+   npm install --legacy-peer-deps
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. Copy the environment template and provide real values:
 
-Follow these steps:
+   ```bash
+   cp .env.example .env
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+   Keep `DATABASE_URL`, `NEON_AUTH_URL`, `NEON_JWKS_URL`, and `PAYSTACK_SECRET_KEY` server-side. The frontend only receives variables prefixed with `VITE_`.
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+3. Start the frontend and API together:
 
-# Step 3: Install the necessary dependencies.
-npm i
+   ```bash
+   npm run fullstack
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+   The Vite frontend is available at `http://localhost:8080`, and the API is available at `http://localhost:3001`.
 
-**Edit a file directly in GitHub**
+4. Apply versioned database migrations when required:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+   ```bash
+   npm run db:migrate
+   ```
 
-**Use GitHub Codespaces**
+## Scripts
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the Vite frontend on port 8080 |
+| `npm run server` | Start the Express API |
+| `npm run fullstack` | Start the frontend and API concurrently |
+| `npm run build` | Build the frontend and API bundle |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run frontend Vitest tests |
+| `npm run test:backend` | Run backend Vitest tests |
+| `npm run test:e2e` | Run Playwright end-to-end tests |
+| `npm run db:generate` | Generate a Drizzle migration from schema changes |
+| `npm run db:migrate` | Apply the versioned Drizzle migrations |
 
-## What technologies are used for this project?
+## Split Deployment
 
-This project is built with:
+The Docker image is API-only. Build and run it with a server-side `.env` containing the API variables, `DATABASE_URL`, Neon Auth settings, and Paystack’s secret key. The image listens on port 3001 and does not serve the Vite build.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Deploy the frontend separately using the instructions in [`FRONTEND_DEPLOYMENT.md`](./FRONTEND_DEPLOYMENT.md). Set `VITE_API_URL` to the public API origin, `VITE_NEON_AUTH_URL` to the Neon Auth URL, and configure the API’s `FRONTEND_URL` as a comma-separated allow-list of permitted frontend origins.
 
-## How can I deploy this project?
+## Security Notes
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Neon Auth webhook requests are verified using Neon’s signed detached JWS Ed25519 scheme before their payloads are processed. Paystack webhooks continue to use their HMAC signature verification. Database TLS certificate verification is enabled for Neon connections, and file logging is opt-in through `LOG_TO_FILE=true`.
 
-## Can I connect a custom domain to my Lovable project?
+Do not commit `.env` files or include them in Docker build contexts. The credentials that were present in the supplied archive must be rotated in the Neon Console before deployment; see the final remediation summary for the required operator actions.
 
-Yes, you can!
+## Historical Documentation
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Clerk-era deployment and registration documents are preserved under `docs/archive/` for reference only. They are not instructions for the current Neon Auth architecture. `AUTH_MIGRATION_GUIDE.md` remains current.
