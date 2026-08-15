@@ -1,10 +1,15 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react';
 
-const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
+// The Neon Auth base URL is public configuration, not a secret. The Vercel
+// environment should still define VITE_NEON_AUTH_URL, but this known production
+// endpoint fallback prevents a missing dashboard variable from crashing the
+// compiled frontend at module load.
+const productionAuthUrl = 'https://ep-autumn-resonance-ancbtuoc.neonauth.c-6.us-east-1.aws.neon.tech/neondb/auth';
+const authUrl = import.meta.env.VITE_NEON_AUTH_URL?.trim() || productionAuthUrl;
 
-if (!authUrl) {
-  throw new Error('[AUTH] VITE_NEON_AUTH_URL must be set for the frontend Neon Auth client.');
+if (!import.meta.env.VITE_NEON_AUTH_URL) {
+  console.warn('[AUTH] VITE_NEON_AUTH_URL is missing; using the production Neon Auth endpoint fallback. Configure the Vercel variable for future environment portability.');
 }
 
 export const neonConfig = {
