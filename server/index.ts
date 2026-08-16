@@ -17,6 +17,7 @@ import { rateLimit } from 'express-rate-limit';
 import { createServer } from 'http';
 import { initSocket } from './src/utils/socket';
 import { errorHandler } from './src/middleware/errorHandler';
+import { getAllowedFrontendOrigins } from './src/config/cors';
 
 import authRoutes from './src/routes/authRoutes';
 import memberRoutes from './src/routes/memberRoutes';
@@ -32,10 +33,7 @@ import notificationRoutes from './src/routes/notificationRoutes';
 const app = express();
 const httpServer = createServer(app);
 const port = Number(process.env.PORT || 3001);
-const frontendOrigins: Origin[] = (process.env.FRONTEND_URL || 'http://localhost:8080')
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const frontendOrigins: Origin[] = getAllowedFrontendOrigins();
 const apiPublicUrl = process.env.API_PUBLIC_URL || `http://localhost:${port}`;
 const neonAuthOrigin = process.env.NEON_AUTH_URL
   ? new URL(process.env.NEON_AUTH_URL).origin

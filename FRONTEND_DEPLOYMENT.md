@@ -22,7 +22,7 @@ Configure the API container with the following server-side variables:
 NODE_ENV=production
 PORT=3001
 API_PUBLIC_URL=https://api.example.com
-FRONTEND_URL=https://gym.example.com,https://staging-gym.example.com
+FRONTEND_URL=https://optibizgym.vercel.app,https://optizgym.vercel.app,https://staging-gym.example.com
 DATABASE_URL=postgresql://...
 NEON_AUTH_URL=https://<neon-auth-host>/neondb/auth
 NEON_JWKS_URL=https://<neon-auth-host>/neondb/auth/.well-known/jwks.json
@@ -31,7 +31,7 @@ NEON_WEBHOOK_MAX_AGE_MS=300000
 LOG_TO_FILE=false
 ```
 
-`FRONTEND_URL` is a comma-separated allow-list. `API_PUBLIC_URL` is used by the API’s Content Security Policy and should be the same public origin used in `VITE_API_URL`. Use HTTPS in deployed environments so the Socket.IO client can use `wss:`.
+`FRONTEND_URL` is a comma-separated allow-list. For the current OptizGYM deployment, include both `https://optibizgym.vercel.app` (the hostname currently shown by the failing browser request) and `https://optizgym.vercel.app` (the previously configured Vercel hostname). The API also includes these two owned production aliases defensively at runtime, but they should remain in Render’s `FRONTEND_URL` value for clear deployment configuration. `API_PUBLIC_URL` is used by the API’s Content Security Policy and should be the same public origin used in `VITE_API_URL`. Use HTTPS in deployed environments so the Socket.IO client can use `wss:`.
 
 ## Build and publish the frontend
 

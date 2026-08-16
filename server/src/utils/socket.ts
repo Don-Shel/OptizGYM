@@ -4,13 +4,14 @@ import { db } from './db';
 import { members } from '../db/schema';
 import { eq, isNull } from 'drizzle-orm';
 import { verifyNeonToken } from './neon';
+import { getAllowedFrontendOrigins } from '../config/cors';
 
 let io: Server;
 
 export const initSocket = (server: HttpServer) => {
   io = new Server(server, {
     cors: {
-      origin: (process.env.FRONTEND_URL || 'http://localhost:8080').split(',').map((origin) => origin.trim()).filter(Boolean),
+      origin: getAllowedFrontendOrigins(),
       methods: ['GET', 'POST'],
       credentials: true,
     },
