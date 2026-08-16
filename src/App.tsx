@@ -34,6 +34,7 @@ const Progress = lazy(() => import("./pages/dashboard/Progress"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminMembers = lazy(() => import("./pages/admin/AdminMembers"));
 const AdminClasses = lazy(() => import("./pages/admin/AdminClasses"));
+const AdminTrainers = lazy(() => import("./pages/admin/AdminTrainers"));
 const AdminPayments = lazy(() => import("./pages/admin/AdminPayments"));
 
 const queryClient = new QueryClient({
@@ -63,11 +64,9 @@ const LoadingFallback = () => (
 const ProtectedRoute = ({
   children,
   adminOnly = false,
-  requiresMembership = false,
 }: {
   children: React.ReactNode;
   adminOnly?: boolean;
-  requiresMembership?: boolean;
 }) => {
   const { isSignedIn, isLoaded, user } = useAuth();
 
@@ -82,14 +81,6 @@ const ProtectedRoute = ({
 
   // Role check for admin-only routes
   if (adminOnly && user?.role !== "admin") return <Navigate to="/dashboard" replace />;
-
-  // Training content requires a paid active membership. Keep the membership
-  // page available so free/pending users have a clear upgrade path.
-  const hasActiveMembership = user?.role === "admin"
-    || (user?.membershipStatus === "active" && user?.plan !== "free");
-  if (requiresMembership && !hasActiveMembership) {
-    return <Navigate to="/dashboard/membership?required=active" replace />;
-  }
 
   return <>{children}</>;
 };
@@ -134,16 +125,17 @@ const AppRoutes = () => (
       <Route path="/verify-email" element={<Navigate to="/auth/verify-email" replace />} />
 
       {/* ── Member Dashboard ── */}
-      <Route path="/dashboard" element={<ProtectedRoute requiresMembership><MemberDashboard /></ProtectedRoute>} />
-      <Route path="/dashboard/classes" element={<ProtectedRoute requiresMembership><ClassBooking /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><MemberDashboard /></ProtectedRoute>} />
+      <Route path="/dashboard/classes" element={<ProtectedRoute><ClassBooking /></ProtectedRoute>} />
       <Route path="/dashboard/membership" element={<ProtectedRoute><Membership /></ProtectedRoute>} />
       <Route path="/dashboard/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
-      <Route path="/dashboard/progress" element={<ProtectedRoute requiresMembership><Progress /></ProtectedRoute>} />
+      <Route path="/dashboard/progress" element={<ProtectedRoute><Progress /></ProtectedRoute>} />
 
       {/* ── Admin ── */}
       <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/members" element={<ProtectedRoute adminOnly><AdminMembers /></ProtectedRoute>} />
       <Route path="/admin/classes" element={<ProtectedRoute adminOnly><AdminClasses /></ProtectedRoute>} />
+      <Route path="/admin/trainers" element={<ProtectedRoute adminOnly><AdminTrainers /></ProtectedRoute>} />
       <Route path="/admin/payments" element={<ProtectedRoute adminOnly><AdminPayments /></ProtectedRoute>} />
       <Route path="/admin/analytics" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
 
