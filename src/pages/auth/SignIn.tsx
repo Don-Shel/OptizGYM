@@ -1,11 +1,14 @@
 import { FormEvent, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { motion } from "framer-motion";
 import { Dumbbell, Loader2, MailCheck } from "lucide-react";
 import { authClient } from "@/lib/neon";
 import { toast } from "sonner";
 
 const SignIn = () => {
+  const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,9 +34,11 @@ const SignIn = () => {
         fetchOptions: { throw: true },
       });
 
+      // Neon Auth updates its session hook asynchronously. Explicitly refresh
+      // the member profile here so the route guard has a user before navigation.
+      await refreshUser();
       toast.success("Signed in successfully.");
-      // Do not navigate immediately. AuthContext waits for the refreshed JWT
-      // and member profile, then AuthRoute redirects to the correct dashboard.
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       const message = error instanceof Error
         ? error.message

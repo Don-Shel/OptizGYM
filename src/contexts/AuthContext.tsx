@@ -39,7 +39,7 @@ interface AuthContextType {
   signUp: () => void;
   signOut: () => void;
   getToken: () => Promise<string | null>;
-  refreshUser: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -94,8 +94,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Prevent double-fetching for the same session
   const resolvedSessionId = useRef<string | null>(null);
-  // Prevent concurrent fetch calls
-  const fetchInFlight = useRef(false);
+  // Monotonically increasing request id prevents an older unauthenticated
+  // profile request from overwriting a newer authenticated session.
+  const profileRequestId = useRef(0);
 
   // ── Reliable token getter ─────────────────────────────────────────────────
   // Neon Auth issues short-lived JWTs through authClient.token().
@@ -103,31 +104,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // ── Core profile fetch/sync ───────────────────────────────────────────────
   const fetchUserProfile = useCallback(async () => {
-    if (fetchInFlight.current) return;
-    fetchInFlight.current = true;
+    const requestId = ++profileRequestId.current;
+    setIsLoaded(false);
 
     try {
       const sessionResponse = await authClient.getSession();
+      const token = await getAuthToken();
       const sessionUser = extractSessionUser(sessionResponse);
-      let token: string | null = null;
 
-      // Neon may establish the browser session a moment before the short-lived
-      // API JWT is ready. Retry briefly instead of navigating the user back to
-      // sign-in with an apparently valid session but no dashboard profile.
-      for (let attempt = 0; attempt < 4 && !token; attempt += 1) {
-        token = await getAuthToken();
-        if (!token && attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-        }
-      }
+      if (requestId !== profileRequestId.current) return;
 
       if (!token) {
-        console.warn('[AUTH] getSession() returned no token after retries');
+        console.warn('[AUTH] getSession() returned no token — waiting for token refresh');
+        // Allow the same session to be resolved again when Neon Auth finishes
+        // issuing the short-lived API JWT after sign-in/sign-up.
         resolvedSessionId.current = null;
         setUser(null);
         setIsLoaded(true);
         return;
       }
+
+      if (requestId !== profileRequestId.current) return;
 
       setIsSyncing(true);
       setSyncError(null);
@@ -141,6 +138,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (meRes.ok) {
         const { data } = await meRes.json();
+        if (requestId !== profileRequestId.current) return;
         setUser(mapMember(data));
         if (!data.isEmailVerified && data.email) {
           sessionStorage.setItem('pendingVerifyEmail', data.email);
@@ -165,6 +163,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (syncRes.ok) {
           const { data } = await syncRes.json();
+          if (requestId !== profileRequestId.current) return;
           setUser(mapMember(data));
           if (!data.isEmailVerified && data.email) {
             sessionStorage.setItem('pendingVerifyEmail', data.email);
@@ -186,13 +185,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setUser(null);
     } catch (err) {
+      if (requestId !== profileRequestId.current) return;
       console.error('[AUTH] fetchUserProfile error:', err);
       setSyncError('Network error. Please refresh.');
       setUser(null);
     } finally {
-      setIsSyncing(false);
-      setIsLoaded(true);
-      fetchInFlight.current = false;
+      if (requestId === profileRequestId.current) {
+        setIsSyncing(false);
+        setIsLoaded(true);
+      }
     }
   }, []);
 
