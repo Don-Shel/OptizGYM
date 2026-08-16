@@ -24,6 +24,14 @@ export const classSchema = z.object({
   requirements: z.string().max(500).optional(),
 });
 
+export const trainerSchema = z.object({
+  fullName: z.string().trim().min(2, 'Full name must be at least 2 characters').max(120),
+  email: z.string().trim().email('Enter a valid email address').max(320),
+  specialty: z.string().trim().max(120).optional().or(z.literal('')),
+  bio: z.string().trim().max(1000).optional().or(z.literal('')),
+  avatarUrl: z.string().trim().url('Avatar URL must be a valid URL').max(1000).optional().or(z.literal('')),
+});
+
 export const bookingSchema = z.object({
   member_id: z.string().uuid(),
   class_id: z.string().uuid(),

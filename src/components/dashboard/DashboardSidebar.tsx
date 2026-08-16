@@ -26,6 +26,7 @@ const adminNav: NavItem[] = [
   { label: "Admin Overview", path: "/admin", icon: Shield },
   { label: "Members", path: "/admin/members", icon: Users },
   { label: "Classes", path: "/admin/classes", icon: BookOpen },
+  { label: "Trainers", path: "/admin/trainers", icon: Dumbbell },
   { label: "Payments", path: "/admin/payments", icon: CreditCard },
   { label: "Analytics", path: "/admin/analytics", icon: BarChart3 },
 ];

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { db } from '../utils/db';
 import { classes, instructors } from '../db/schema';
 import { successResponse, errorResponse } from '../utils/responses';
-import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getFromCache, setToCache, removeFromCache } from '../utils/cache';
 import { broadcastToAll } from '../utils/socket';
 import { notifyAllActiveMembers } from './notificationController';
@@ -38,7 +38,7 @@ const enrichClass = (row: { classes: typeof classes.$inferSelect; instructors: t
 const getPublicClass = async (id: string) => {
   const [row] = await db.select()
     .from(classes)
-    .leftJoin(instructors, eq(classes.instructorId, instructors.id))
+    .leftJoin(instructors, and(eq(classes.instructorId, instructors.id), isNull(instructors.deletedAt)))
     .where(eq(classes.id, id))
     .limit(1);
   return row ? enrichClass(row) : null;
@@ -51,7 +51,7 @@ export const getAllClasses = async (_req: Request, res: Response) => {
 
     const rows = await db.select()
       .from(classes)
-      .leftJoin(instructors, eq(classes.instructorId, instructors.id))
+      .leftJoin(instructors, and(eq(classes.instructorId, instructors.id), isNull(instructors.deletedAt)))
       .where(isNull(classes.deletedAt))
       .orderBy(classes.schedule);
     const allClasses = rows.map(enrichClass);
@@ -66,7 +66,6 @@ export const createClass = async (req: Request, res: Response) => {
   try {
     const [newClass] = await db.insert(classes).values(normalizeClassPayload(req.body)).returning();
     removeFromCache(CACHE_KEYS.ALL_CLASSES);
-    removeFromCache(CACHE_KEYS.ALL_INSTRUCTORS);
     const publicClass = await getPublicClass(newClass.id);
     if (publicClass) {
       broadcastToAll('class-created', publicClass);
@@ -90,7 +89,6 @@ export const updateClass = async (req: Request, res: Response) => {
       .returning();
     if (!updatedClass) return errorResponse(res, 'Class not found', 404);
     removeFromCache(CACHE_KEYS.ALL_CLASSES);
-    removeFromCache(CACHE_KEYS.ALL_INSTRUCTORS);
     const publicClass = await getPublicClass(updatedClass.id);
     if (publicClass) {
       broadcastToAll('class-updated', publicClass);
@@ -115,7 +113,6 @@ export const deleteClass = async (req: Request, res: Response) => {
       .returning();
     if (!deletedClass) return errorResponse(res, 'Class not found', 404);
     removeFromCache(CACHE_KEYS.ALL_CLASSES);
-    removeFromCache(CACHE_KEYS.ALL_INSTRUCTORS);
     broadcastToAll('class-deleted', { id: deletedClass.id });
     if (existingClass) {
       await notifyAllActiveMembers('Class removed from schedule', `${existingClass.name} is no longer available to book.`, 'warning');
@@ -130,41 +127,9 @@ export const getAllInstructors = async (_req: Request, res: Response) => {
   try {
     const cached = getFromCache(CACHE_KEYS.ALL_INSTRUCTORS);
     if (cached) return successResponse(res, cached);
-
     const allInstructors = await db.select().from(instructors).where(isNull(instructors.deletedAt));
-    const legacyRows = await db.select({
-      name: classes.instructorLegacy,
-      category: classes.category,
-    }).from(classes).where(and(isNull(classes.deletedAt), isNotNull(classes.instructorLegacy)));
-
-    const profiles = [...allInstructors];
-    const knownNames = new Set(profiles.map((trainer) => trainer.fullName.trim().toLowerCase()));
-    const fallbackByName = new Map<string, any>();
-
-    for (const row of legacyRows) {
-      const name = row.name?.trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
-      if (knownNames.has(key) || fallbackByName.has(key)) continue;
-      const specialty = row.category
-        ? `${row.category.charAt(0).toUpperCase()}${row.category.slice(1)} coach`
-        : 'Performance coach';
-      fallbackByName.set(key, {
-        id: `legacy-${key.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase()}`,
-        fullName: name,
-        email: '',
-        specialty,
-        bio: `Leading ${row.category || 'performance'} sessions at OptizGYM with practical coaching and measurable progress.`,
-        avatarUrl: null,
-        createdAt: null,
-        updatedAt: null,
-        deletedAt: null,
-      });
-    }
-
-    const publicProfiles = [...profiles, ...fallbackByName.values()];
-    setToCache(CACHE_KEYS.ALL_INSTRUCTORS, publicProfiles);
-    return successResponse(res, publicProfiles);
+    setToCache(CACHE_KEYS.ALL_INSTRUCTORS, allInstructors);
+    return successResponse(res, allInstructors);
   } catch (error) {
     return errorResponse(res, 'Failed to fetch instructors', 500, error);
   }

@@ -7,21 +7,8 @@
  */
 
 const configuredApiUrl = import.meta.env.VITE_API_URL?.trim();
-const normalizedConfiguredApiUrl = configuredApiUrl?.replace(/\/+$/, '') ?? '';
-const browserHost = typeof window === 'undefined' ? '' : window.location.hostname;
-const isLocalBrowserHost = browserHost === 'localhost' || browserHost === '127.0.0.1' || browserHost === '[::1]';
-const pointsToLocalApi = /^(https?:\/\/)(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(normalizedConfiguredApiUrl);
-
-// When the app is opened through a temporary/public Vite host, a configured
-// localhost API URL refers to the browser’s own machine rather than the
-// sandbox API. Use the Vite /api proxy in that case. In production, a public
-// HTTPS VITE_API_URL remains authoritative.
-const effectiveApiOrigin = normalizedConfiguredApiUrl && !(pointsToLocalApi && !isLocalBrowserHost)
-  ? normalizedConfiguredApiUrl
-  : '';
-
-export const API_BASE = effectiveApiOrigin
-  ? `${effectiveApiOrigin}${effectiveApiOrigin.endsWith('/api') ? '' : '/api'}`
+export const API_BASE = configuredApiUrl
+  ? `${configuredApiUrl.replace(/\/+$/, '')}${configuredApiUrl.replace(/\/+$/, '').endsWith('/api') ? '' : '/api'}`
   : '/api';
 
 const getHeaders = (token?: string | null): HeadersInit => ({
@@ -136,6 +123,19 @@ export const api = {
     markRead: async (id: string, token: string | null) => request(`/notifications/${id}/read`, {
       method: 'PATCH', headers: getHeaders(token),
     }, 'Failed to mark notification as read'),
+  },
+
+  trainers: {
+    getAll: async (token: string | null) => request('/trainers', { headers: getHeaders(token) }, 'Failed to fetch trainers'),
+    create: async (data: any, token: string | null) => request('/trainers', {
+      method: 'POST', headers: getHeaders(token), body: JSON.stringify(data),
+    }, 'Failed to create trainer'),
+    update: async (id: string, data: any, token: string | null) => request(`/trainers/${id}`, {
+      method: 'PUT', headers: getHeaders(token), body: JSON.stringify(data),
+    }, 'Failed to update trainer'),
+    delete: async (id: string, token: string | null) => request(`/trainers/${id}`, {
+      method: 'DELETE', headers: getHeaders(token),
+    }, 'Failed to delete trainer'),
   },
 
   admin: {

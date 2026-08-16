@@ -29,6 +29,7 @@ import systemRoutes from './src/routes/systemRoutes';
 import webhookRoutes from './src/routes/webhookRoutes';
 import equipmentRoutes from './src/routes/equipmentRoutes';
 import notificationRoutes from './src/routes/notificationRoutes';
+import trainerRoutes from './src/routes/trainerRoutes';
 
 const app = express();
 const httpServer = createServer(app);
@@ -110,6 +111,7 @@ app.use('/api/payments', authLimiter, paymentRoutes);
 app.use('/api/workouts', workoutRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/trainers', trainerRoutes);
 app.use('/api', systemRoutes);
 
 // The frontend is deployed separately in the split topology; this process is API-only.
