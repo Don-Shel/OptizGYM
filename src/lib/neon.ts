@@ -32,15 +32,57 @@ export const authClient = createAuthClient(neonConfig.authUrl, {
   },
 });
 
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 /**
  * Return a short-lived Neon Auth JWT for forwarding to the API.
- * The SDK refreshes the token when necessary; callers must not cache it.
+ *
+ * Neon can expose the JWT in either the Better Auth session object or the
+ * dedicated `/token` response. Immediately after email/password sign-in,
+ * the session cookie and the JWT header can become available on adjacent
+ * requests, so both sources are checked and retried briefly.
  */
 export const getAuthToken = async (): Promise<string | null> => {
-  const { data, error } = await authClient.token();
-  if (error) {
-    console.warn('[AUTH] Unable to obtain API token:', error);
-    return null;
+  const client = authClient as any;
+  const maxAttempts = 5;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const sessionResponse = await client.getSession({
+        fetchOptions: { credentials: 'include' },
+      });
+      const sessionToken = sessionResponse?.data?.session?.token;
+      if (typeof sessionToken === 'string' && sessionToken.length > 0) {
+        return sessionToken;
+      }
+    } catch (error) {
+      if (attempt === maxAttempts - 1) {
+        console.warn('[AUTH] Unable to read the Neon Auth session:', error);
+      }
+    }
+
+    try {
+      const tokenResponse = await client.token({
+        fetchOptions: {
+          credentials: 'include',
+          throw: false,
+        },
+      });
+      const token = tokenResponse?.data?.token ?? tokenResponse?.token;
+      if (typeof token === 'string' && token.length > 0) {
+        return token;
+      }
+    } catch (error) {
+      if (attempt === maxAttempts - 1) {
+        console.warn('[AUTH] Unable to obtain the Neon Auth API token:', error);
+      }
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await wait(250 * (attempt + 1));
+    }
   }
-  return data?.token ?? null;
+
+  console.warn('[AUTH] No Neon Auth JWT was available after retries. The user may still be signed out or the Auth origin/session cookie may be misconfigured.');
+  return null;
 };
