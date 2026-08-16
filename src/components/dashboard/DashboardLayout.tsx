@@ -1,11 +1,13 @@
 import { useState, ReactNode, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 import { Menu, Bell, Check, ExternalLink } from "lucide-react";
 import DashboardSidebar from "./DashboardSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/api/useNotifications";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import ProfileModal from "./ProfileModal";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -17,6 +19,7 @@ const DashboardLayout = ({ children, title, subtitle }: DashboardLayoutProps) =>
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { user, isLoaded, isSignedIn, syncError, refreshUser } = useAuth();
   const { notifications, unreadCount, markRead, isLoading: notificationsLoading } = useNotifications();
   const navigate = useNavigate();
@@ -48,21 +51,25 @@ const DashboardLayout = ({ children, title, subtitle }: DashboardLayoutProps) =>
           <div className="flex items-center gap-4"><button onClick={() => setMobileOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground"><Menu className="h-5 w-5" /></button>{title && <div><h1 className="text-base font-semibold text-foreground">{title}</h1>{subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}</div>}</div>
           <div className="flex items-center gap-3">
             <div className="relative">
-              <button aria-label="Open notifications" onClick={() => setNotificationsOpen((open) => !open)} className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"><Bell className="h-4 w-4" />{unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 h-4 rounded-full bg-primary px-1 text-[9px] font-bold leading-4 text-primary-foreground">{unreadCount > 9 ? '9+' : unreadCount}</span>}</button>
-              {notificationsOpen && <>
+              <button aria-label="Open notifications" onClick={() => { setProfileOpen(false); setNotificationsOpen((open) => !open); }} className="relative h-9 w-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"><Bell className="h-4 w-4" />{unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-4 h-4 rounded-full bg-primary px-1 text-[9px] font-bold leading-4 text-primary-foreground">{unreadCount > 9 ? '9+' : unreadCount}</span>}</button>
+              {notificationsOpen && createPortal(<>
                 <button aria-label="Close notifications" className="fixed inset-0 z-[9999] cursor-default" onClick={() => setNotificationsOpen(false)} />
                 <motion.div initial={{ opacity: 0, y: -6, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="fixed right-4 top-[4.5rem] z-[10000] w-[min(calc(100vw-2rem),360px)] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
                   <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><p className="text-sm font-semibold text-foreground">Notifications</p><p className="text-[11px] text-muted-foreground">Live updates from OptizGYM</p></div>{unreadCount > 0 && <span className="text-[11px] font-semibold text-primary">{unreadCount} unread</span>}</div>
                   <div className="max-h-80 overflow-y-auto">{notificationsLoading ? <div className="p-6 text-center text-xs text-muted-foreground">Loading notifications…</div> : notifications.length === 0 ? <div className="p-6 text-center text-xs text-muted-foreground">You’re all caught up.</div> : notifications.slice(0, 12).map((notification: any) => <button key={notification.id} onClick={() => { if (!notification.isRead) markRead.mutate(notification.id); }} className={cn("w-full border-b border-border/50 px-4 py-3 text-left transition-colors hover:bg-accent/40", !notification.isRead && "bg-primary/5")}><div className="flex gap-3"><div className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", notification.isRead ? "bg-muted" : "bg-primary")} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-foreground">{notification.title}</p>{notification.isRead ? <Check className="h-3 w-3 text-muted-foreground" /> : <span className="text-[10px] text-muted-foreground">New</span>}</div><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{notification.message}</p><p className="mt-2 text-[10px] text-muted-foreground/70">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : ''}</p></div></div></button>)}</div>
                   <button onClick={() => navigate('/dashboard/classes')} className="flex w-full items-center justify-center gap-1 border-t border-border px-4 py-3 text-xs font-semibold text-primary hover:bg-primary/5">Explore classes <ExternalLink className="h-3 w-3" /></button>
                 </motion.div>
-              </>}
+                </>, document.body)}
             </div>
-            <div className="flex items-center gap-2 rounded-lg bg-accent/50 px-3 py-1.5"><div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center"><span className="text-xs font-bold text-primary">{user.fullName?.charAt(0)}</span></div><span className="hidden text-xs font-medium text-foreground sm:block">{user.fullName}</span></div>
+            <button aria-label="Open profile settings" onClick={() => { setNotificationsOpen(false); setProfileOpen(true); }} className="flex items-center gap-2 rounded-lg bg-accent/50 px-3 py-1.5 text-left transition hover:bg-accent">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/20"><span className="text-xs font-bold text-primary">{user.fullName?.charAt(0)}</span></div>
+              <span className="hidden text-xs font-medium text-foreground sm:block">{user.fullName}</span>
+            </button>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 lg:p-6"><motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>{children}</motion.div></main>
       </div>
+      <ProfileModal user={user} open={profileOpen} onOpenChange={setProfileOpen} />
     </div>
   );
 };

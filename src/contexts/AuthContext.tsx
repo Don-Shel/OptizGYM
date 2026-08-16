@@ -20,6 +20,7 @@ export interface User {
   email: string;
   isEmailVerified: boolean;
   fullName: string;
+  phone?: string;
   role: 'member' | 'admin';
   plan: 'free' | 'basic' | 'pro' | 'elite';
   planBilling: 'monthly' | 'yearly';
@@ -53,6 +54,7 @@ function mapMember(data: any): User {
     email: data.email,
     isEmailVerified: data.isEmailVerified === 1 || data.isEmailVerified === true,
     fullName: data.fullName || 'User',
+    phone: data.phone || undefined,
     role: data.role || 'member',
     plan: data.plan,
     planBilling: data.planBilling,

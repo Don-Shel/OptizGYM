@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/db';
+import { authClient } from '@/lib/neon';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
@@ -68,6 +69,27 @@ export const useMembers = () => {
     onError: (error: any) => toast.error(error.message || 'Failed to remove member'),
   });
 
+  const useUpdateProfile = () => useMutation({
+    mutationFn: async ({ fullName, phone }: { fullName: string; phone: string }) => {
+      const normalizedName = fullName.trim();
+      if (normalizedName.length < 2) throw new Error('Full name must be at least 2 characters');
+
+      await (authClient as any).updateUser({
+        name: normalizedName,
+        fetchOptions: { throw: true },
+      });
+
+      const token = await getToken();
+      return api.members.updateProfile({ phone: phone.trim() }, token);
+    },
+    onSuccess: async () => {
+      await refreshUser();
+      queryClient.invalidateQueries({ queryKey: ['members', 'me'] });
+      toast.success('Profile updated successfully');
+    },
+    onError: (error: any) => toast.error(error.message || 'Failed to update profile'),
+  });
+
   const useUpdateMembership = () => useMutation({
     mutationFn: async (data: { action: 'cancel' | 'resume' | 'freeze' | 'unfreeze'; months?: number }) => api.members.updateMembership(data, await getToken()),
     onSuccess: async () => {
@@ -91,6 +113,7 @@ export const useMembers = () => {
     useSuspendMember,
     useRemoveMember,
     useUpdateMembership,
+    useUpdateProfile,
     useSyncMember,
   };
 };

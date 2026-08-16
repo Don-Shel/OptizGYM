@@ -42,6 +42,9 @@ export const api = {
   members: {
     getAll: async (token?: string | null) => request('/members', { headers: getHeaders(token) }, 'Failed to fetch members'),
     getMe: async (token: string) => request('/members/me', { headers: getHeaders(token) }, 'Failed to fetch profile'),
+    updateProfile: async (data: { phone: string }, token: string | null) => request('/members/me/profile', {
+      method: 'PATCH', headers: getHeaders(token), body: JSON.stringify(data),
+    }, 'Failed to update profile'),
     updateMembership: async (data: any, token?: string | null) => request('/members/me/membership', {
       method: 'PATCH', headers: getHeaders(token), body: JSON.stringify(data),
     }, 'Failed to update membership'),

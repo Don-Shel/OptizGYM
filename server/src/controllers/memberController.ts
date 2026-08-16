@@ -130,6 +130,25 @@ export const getMe = async (req: any, res: Response) => {
   }
 };
 
+export const updateMyProfile = async (req: any, res: Response) => {
+  try {
+    if (!req.member) return errorResponse(res, 'Member profile not found', 404);
+
+    const [updated] = await db.update(members)
+      .set({
+        phone: String(req.body.phone ?? '').trim() || null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(members.id, req.member.id), isNull(members.deletedAt)))
+      .returning();
+
+    if (!updated) return errorResponse(res, 'Member profile not found', 404);
+    return successResponse(res, updated);
+  } catch (error) {
+    return errorResponse(res, 'Failed to update profile', 500, error);
+  }
+};
+
 export const createMember = async (req: any, res: Response) => {
   try {
     const authId = req.auth.userId;

@@ -32,6 +32,10 @@ export const trainerSchema = z.object({
   avatarUrl: z.string().trim().url('Avatar URL must be a valid URL').max(1000).optional().or(z.literal('')),
 });
 
+export const profileSchema = z.object({
+  phone: z.string().trim().max(40, 'Phone number is too long').optional().or(z.literal('')),
+});
+
 export const bookingSchema = z.object({
   member_id: z.string().uuid(),
   class_id: z.string().uuid(),
