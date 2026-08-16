@@ -181,12 +181,44 @@ export const createMember = async (req: any, res: Response) => {
   }
 };
 
+const isDuplicateMemberError = (error: unknown) => (
+  typeof error === 'object'
+  && error !== null
+  && 'code' in error
+  && (error as { code?: string }).code === '23505'
+);
+
+export const createMemberAdmin = async (req: any, res: Response) => {
+  try {
+    const [existing] = await db.select().from(members).where(
+      and(eq(members.authUserId, req.body.authUserId), isNull(members.deletedAt))
+    ).limit(1);
+    if (existing) return errorResponse(res, 'A member profile already exists for this Neon Auth user', 409);
+
+    const [created] = await db.insert(members).values({
+      authUserId: req.body.authUserId.trim(),
+      email: req.body.email.trim().toLowerCase(),
+      fullName: req.body.fullName.trim(),
+      phone: req.body.phone?.trim() || null,
+      plan: req.body.plan,
+      planBilling: req.body.planBilling,
+      membershipStatus: req.body.membershipStatus,
+      isEmailVerified: req.body.isEmailVerified ? 1 : 0,
+      role: 'member',
+    }).returning();
+    return successResponse(res, created, 201);
+  } catch (error) {
+    if (isDuplicateMemberError(error)) return errorResponse(res, 'A member with this Auth ID or email already exists', 409);
+    return errorResponse(res, 'Failed to create member profile', 500, error);
+  }
+};
+
 const allowedPlans = new Set(['free', 'basic', 'pro', 'elite']);
 const allowedStatuses = new Set(['active', 'pending', 'expired', 'cancelled']);
 
 export const updateMemberAdmin = async (req: any, res: Response) => {
   try {
-    const { fullName, phone, plan, planBilling, membershipStatus, role } = req.body;
+    const { fullName, phone, plan, planBilling, membershipStatus, role, isEmailVerified } = req.body;
     if (plan !== undefined && !allowedPlans.has(plan)) return errorResponse(res, 'Invalid plan', 422);
     if (membershipStatus !== undefined && !allowedStatuses.has(membershipStatus)) return errorResponse(res, 'Invalid membership status', 422);
     if (planBilling !== undefined && !['monthly', 'yearly'].includes(planBilling)) return errorResponse(res, 'Invalid billing cycle', 422);
@@ -199,6 +231,7 @@ export const updateMemberAdmin = async (req: any, res: Response) => {
       ...(planBilling !== undefined ? { planBilling } : {}),
       ...(membershipStatus !== undefined ? { membershipStatus } : {}),
       ...(role !== undefined ? { role } : {}),
+      ...(isEmailVerified !== undefined ? { isEmailVerified: isEmailVerified ? 1 : 0 } : {}),
       updatedAt: new Date(),
     }).where(and(eq(members.id, req.params.id), isNull(members.deletedAt))).returning();
 
@@ -220,6 +253,21 @@ export const suspendMember = async (req: any, res: Response) => {
     return successResponse(res, updated);
   } catch (error) {
     return errorResponse(res, 'Failed to suspend member', 500, error);
+  }
+};
+
+export const activateMember = async (req: any, res: Response) => {
+  try {
+    const [updated] = await db.update(members).set({
+      membershipStatus: 'active',
+      ...(req.body?.plan && allowedPlans.has(req.body.plan) ? { plan: req.body.plan } : {}),
+      ...(req.body?.planBilling && ['monthly', 'yearly'].includes(req.body.planBilling) ? { planBilling: req.body.planBilling } : {}),
+      updatedAt: new Date(),
+    }).where(and(eq(members.id, req.params.id), isNull(members.deletedAt))).returning();
+    if (!updated) return errorResponse(res, 'Member not found', 404);
+    return successResponse(res, updated);
+  } catch (error) {
+    return errorResponse(res, 'Failed to activate member profile', 500, error);
   }
 };
 

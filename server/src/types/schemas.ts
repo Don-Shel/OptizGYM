@@ -10,6 +10,38 @@ export const memberSchema = z.object({
   plan_billing: z.enum(['monthly', 'yearly']).default('monthly'),
 });
 
+const memberPlans = ['free', 'basic', 'pro', 'elite'] as const;
+const memberBilling = ['monthly', 'yearly'] as const;
+const memberStatuses = ['active', 'pending', 'expired', 'cancelled'] as const;
+
+export const adminMemberCreateSchema = z.object({
+  authUserId: z.string().trim().min(1, 'Neon Auth user ID is required').max(200),
+  email: z.string().trim().email('Enter a valid email address').max(320),
+  fullName: z.string().trim().min(2, 'Full name must be at least 2 characters').max(120),
+  phone: z.string().trim().max(40).optional().or(z.literal('')),
+  plan: z.enum(memberPlans).default('free'),
+  planBilling: z.enum(memberBilling).default('monthly'),
+  membershipStatus: z.enum(memberStatuses).default('pending'),
+  isEmailVerified: z.boolean().default(false),
+});
+
+export const adminMemberUpdateSchema = z.object({
+  fullName: z.string().trim().min(2).max(120).optional(),
+  phone: z.string().trim().max(40).optional().or(z.literal('')),
+  plan: z.enum(memberPlans).optional(),
+  planBilling: z.enum(memberBilling).optional(),
+  membershipStatus: z.enum(memberStatuses).optional(),
+  role: z.enum(['member', 'admin']).optional(),
+  isEmailVerified: z.boolean().optional(),
+});
+
+export const adminMemberStatusSchema = z.object({
+  membershipStatus: z.enum(memberStatuses),
+  plan: z.enum(memberPlans).optional(),
+  planBilling: z.enum(memberBilling).optional(),
+  expiresAt: z.string().datetime().nullable().optional(),
+});
+
 export const classSchema = z.object({
   name: z.string().min(1),
   instructor: z.string().min(1),

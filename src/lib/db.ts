@@ -51,9 +51,15 @@ export const api = {
     create: async (data: any, token?: string | null) => request('/members', {
       method: 'POST', headers: getHeaders(token), body: JSON.stringify(data),
     }, 'Failed to create member'),
+    createAdmin: async (data: any, token?: string | null) => request('/members/admin', {
+      method: 'POST', headers: getHeaders(token), body: JSON.stringify(data),
+    }, 'Failed to create member profile'),
     update: async (id: string, data: any, token?: string | null) => request(`/members/${id}`, {
       method: 'PATCH', headers: getHeaders(token), body: JSON.stringify(data),
     }, 'Failed to update member'),
+    activate: async (id: string, data: any = {}, token?: string | null) => request(`/members/${id}/activate`, {
+      method: 'POST', headers: getHeaders(token), body: JSON.stringify(data),
+    }, 'Failed to activate member profile'),
     suspend: async (id: string, token?: string | null) => request(`/members/${id}/suspend`, {
       method: 'POST', headers: getHeaders(token),
     }, 'Failed to suspend member'),

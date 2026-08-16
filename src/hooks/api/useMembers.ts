@@ -30,7 +30,17 @@ export const useMembers = () => {
     },
   });
 
+  const useCreateMemberAdmin = () => useMutation({
+    mutationFn: async (data: any) => api.members.createAdmin(data, await getToken()),
+    onSuccess: () => {
+      invalidateMembers();
+      toast.success('Member profile created successfully');
+    },
+    onError: (error: any) => toast.error(error.message || 'Failed to create member profile'),
+  });
+
   const useCreateMember = () => useMutation({
+
     mutationFn: async (data: any) => {
       const token = await getToken();
       return api.members.create(data, token);
@@ -49,6 +59,15 @@ export const useMembers = () => {
       toast.success('Member updated successfully');
     },
     onError: (error: any) => toast.error(error.message || 'Failed to update member'),
+  });
+
+  const useActivateMember = () => useMutation({
+    mutationFn: async ({ id, data }: { id: string; data?: any }) => api.members.activate(id, data, await getToken()),
+    onSuccess: () => {
+      invalidateMembers();
+      toast.success('Member profile activated');
+    },
+    onError: (error: any) => toast.error(error.message || 'Failed to activate member profile'),
   });
 
   const useSuspendMember = () => useMutation({
@@ -109,7 +128,9 @@ export const useMembers = () => {
     useAllMembers,
     useMe,
     useCreateMember,
+    useCreateMemberAdmin,
     useUpdateMember,
+    useActivateMember,
     useSuspendMember,
     useRemoveMember,
     useUpdateMembership,
