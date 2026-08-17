@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/db';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { requireAuthToken } from './requireAuthToken';
 
 export const TRAINERS_QUERY_KEY = ['admin', 'trainers'];
 
@@ -17,11 +18,11 @@ export const useTrainers = () => {
 
   const useAllTrainers = () => useQuery({
     queryKey: TRAINERS_QUERY_KEY,
-    queryFn: async () => api.trainers.getAll(await getToken()),
+    queryFn: async () => api.trainers.getAll(await requireAuthToken(getToken)),
   });
 
   const useCreateTrainer = () => useMutation({
-    mutationFn: async (data: any) => api.trainers.create(data, await getToken()),
+    mutationFn: async (data: any) => api.trainers.create(data, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateTrainers();
       toast.success('Trainer created successfully');
@@ -30,7 +31,7 @@ export const useTrainers = () => {
   });
 
   const useUpdateTrainer = () => useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => api.trainers.update(id, data, await getToken()),
+    mutationFn: async ({ id, data }: { id: string; data: any }) => api.trainers.update(id, data, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateTrainers();
       toast.success('Trainer updated successfully');
@@ -39,7 +40,7 @@ export const useTrainers = () => {
   });
 
   const useDeleteTrainer = () => useMutation({
-    mutationFn: async (id: string) => api.trainers.delete(id, await getToken()),
+    mutationFn: async (id: string) => api.trainers.delete(id, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateTrainers();
       toast.success('Trainer removed successfully');

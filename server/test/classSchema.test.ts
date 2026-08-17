@@ -33,4 +33,24 @@ describe('classSchema', () => {
     expect(payload.duration_minutes).toBe(45);
     expect(payload.capacity).toBe(20);
   });
+
+  it('rejects an empty instructor instead of allowing a backend 400 with no context', async () => {
+    await expect(classSchema.parseAsync({
+      name: 'Missing Instructor',
+      instructor: '',
+      schedule: '2026-08-17T10:00:00.000Z',
+      durationMinutes: 60,
+      capacity: 20,
+    })).rejects.toThrow(/at least 1 character/i);
+  });
+
+  it('rejects invalid numeric and schedule values before database access', async () => {
+    await expect(classSchema.parseAsync({
+      name: 'Invalid Class',
+      instructor: 'QA Trainer',
+      schedule: 'not-a-date',
+      durationMinutes: 0,
+      capacity: 0,
+    })).rejects.toThrow();
+  });
 });

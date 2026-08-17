@@ -35,7 +35,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const CATEGORIES = ["strength", "cardio", "yoga", "hiit", "cycling", "boxing"];
 const BLANK: Partial<any> = {
-  name: "", instructor: "", instructorId: null, schedule: new Date().toISOString(),
+  name: "", instructor: "Staff", instructorId: null, schedule: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
   durationMinutes: 60, capacity: 20, category: "strength", location: "Main Floor",
   description: "", difficulty: "intermediate", intensity: "medium", requirements: "", enrolled: 0,
 };
@@ -70,12 +70,21 @@ const AdminClasses = () => {
 
   const handleSave = async () => {
     if (!editClass?.name?.trim()) { toast.error("Name is required."); return; }
+    const schedule = editClass.schedule ? new Date(editClass.schedule) : null;
+    const durationMinutes = Number(editClass.durationMinutes ?? editClass.duration_minutes ?? 60);
+    const capacity = Number(editClass.capacity ?? 20);
+    if (!schedule || Number.isNaN(schedule.getTime())) { toast.error("Choose a valid class date and time."); return; }
+    if (!Number.isInteger(durationMinutes) || durationMinutes <= 0) { toast.error("Duration must be a positive whole number."); return; }
+    if (!Number.isInteger(capacity) || capacity <= 0) { toast.error("Capacity must be a positive whole number."); return; }
     const selectedInstructor = instructors.find((instructor: any) => instructor.fullName === (editClass.instructor || editClass.instructorLegacy));
     const data = {
       ...editClass,
       name: editClass.name.trim(),
-      instructor: (editClass.instructor || editClass.instructorLegacy || '').trim(),
+      instructor: (editClass.instructor || editClass.instructorLegacy || 'Staff').trim() || 'Staff',
       instructorId: selectedInstructor?.id || editClass.instructorId || null,
+      schedule: schedule.toISOString(),
+      durationMinutes,
+      capacity,
     };
     try {
       if (isNew) {
@@ -268,11 +277,11 @@ const AdminClasses = () => {
                         </select>
                       ) : type === "datetime-local" ? (
                         <input type="datetime-local" value={editClass.schedule ? format(new Date(editClass.schedule), "yyyy-MM-dd'T'HH:mm") : ""}
-                          onChange={e => setEditClass(c => ({ ...c!, schedule: new Date(e.target.value).toISOString() }))}
+                          onChange={e => setEditClass(c => ({ ...c!, schedule: e.target.value ? new Date(e.target.value).toISOString() : "" }))}
                           className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:border-primary/50 focus:outline-none" />
                       ) : (
                         <input type={type} value={(editClass as any)[key] || (editClass as any)[key === "durationMinutes" ? "duration_minutes" : key] || ""} placeholder={placeholder}
-                          onChange={e => setEditClass(c => ({ ...c!, [key]: type === "number" ? parseInt(e.target.value) : e.target.value }))}
+                          onChange={e => setEditClass(c => ({ ...c!, [key]: type === "number" ? (e.target.value === "" ? undefined : Number(e.target.value)) : e.target.value }))}
                           className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:border-primary/50 focus:outline-none" />
                       )}
                     </div>

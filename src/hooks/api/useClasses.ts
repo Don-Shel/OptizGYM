@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/db';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { requireAuthToken } from './requireAuthToken';
 
 export const useClasses = () => {
   const { getToken } = useAuth();
@@ -19,8 +20,7 @@ export const useClasses = () => {
 
   const useCreateClass = () => useMutation({
     mutationFn: async (data: any) => {
-      const token = await getToken();
-      return api.classes.create(data, token);
+      return api.classes.create(data, await requireAuthToken(getToken));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -33,8 +33,7 @@ export const useClasses = () => {
 
   const useUpdateClass = () => useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const token = await getToken();
-      return api.classes.update(id, data, token);
+      return api.classes.update(id, data, await requireAuthToken(getToken));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });
@@ -47,8 +46,7 @@ export const useClasses = () => {
 
   const useDeleteClass = () => useMutation({
     mutationFn: async (id: string) => {
-      const token = await getToken();
-      return api.classes.delete(id, token);
+      return api.classes.delete(id, await requireAuthToken(getToken));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });

@@ -18,8 +18,12 @@ const getHeaders = (token?: string | null): HeadersInit => ({
 
 const unwrap = async (res: Response, fallbackMsg = 'Request failed'): Promise<any> => {
   if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as Record<string, string>;
-    throw new Error(body.error ?? body.message ?? `${fallbackMsg} (${res.status})`);
+    const body = await res.json().catch(() => ({})) as Record<string, any>;
+    const detail = Array.isArray(body.details)
+      ? body.details.map((item: any) => item?.path ? `${item.path}: ${item.message}` : item?.message).filter(Boolean).join('; ')
+      : '';
+    const message = body.error ?? body.message ?? fallbackMsg;
+    throw new Error(`${message}${detail ? ` — ${detail}` : ''} (${res.status})`);
   }
   const body = await res.json();
   return body.data !== undefined ? body.data : body;

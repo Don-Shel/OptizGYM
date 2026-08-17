@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/db';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { requireAuthToken } from './requireAuthToken';
 
 export const usePayments = () => {
   const { getToken, isSignedIn } = useAuth();
@@ -24,13 +25,13 @@ export const usePayments = () => {
   });
 
   const useCreatePayment = () => useMutation({
-    mutationFn: async (data: any) => api.payments.create(data, await getToken()),
+    mutationFn: async (data: any) => api.payments.create(data, await requireAuthToken(getToken)),
     onSuccess: invalidatePayments,
     onError: (error: any) => toast.error(error.message || 'Failed to process payment record'),
   });
 
   const useVerifyPayment = () => useMutation({
-    mutationFn: async (data: any) => api.payments.verify(data, await getToken()),
+    mutationFn: async (data: any) => api.payments.verify(data, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidatePayments();
       toast.success('Payment verified and membership updated');
@@ -41,9 +42,7 @@ export const usePayments = () => {
   const useAdminPayments = () => useQuery({
     queryKey: ['payments', 'admin'],
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Your admin session is not ready. Please sign in again.');
-      return api.payments.getAdmin(token);
+      return api.payments.getAdmin(await requireAuthToken(getToken));
     },
     enabled: isSignedIn,
     retry: 2,
@@ -51,7 +50,7 @@ export const usePayments = () => {
   });
 
   const useRetryPayment = () => useMutation({
-    mutationFn: async (paymentId: string) => api.payments.retry(paymentId, await getToken()),
+    mutationFn: async (paymentId: string) => api.payments.retry(paymentId, await requireAuthToken(getToken)),
     onSuccess: (data: any) => {
       invalidatePayments();
       if (data?.authorizationUrl) window.open(data.authorizationUrl, '_blank', 'noopener,noreferrer');
@@ -61,7 +60,7 @@ export const usePayments = () => {
   });
 
   const useRemindPayment = () => useMutation({
-    mutationFn: async (paymentId: string) => api.payments.remind(paymentId, await getToken()),
+    mutationFn: async (paymentId: string) => api.payments.remind(paymentId, await requireAuthToken(getToken)),
     onSuccess: () => toast.success('Payment reminder sent'),
     onError: (error: any) => toast.error(error.message || 'Failed to send payment reminder'),
   });

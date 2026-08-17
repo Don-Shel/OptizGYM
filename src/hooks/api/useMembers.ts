@@ -3,6 +3,7 @@ import { api } from '@/lib/db';
 import { authClient } from '@/lib/neon';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { requireAuthToken } from './requireAuthToken';
 
 export const useMembers = () => {
   const { getToken, refreshUser } = useAuth();
@@ -16,8 +17,7 @@ export const useMembers = () => {
   const useAllMembers = () => useQuery({
     queryKey: ['members'],
     queryFn: async () => {
-      const token = await getToken();
-      return api.members.getAll(token);
+      return api.members.getAll(await requireAuthToken(getToken));
     },
   });
 
@@ -31,7 +31,7 @@ export const useMembers = () => {
   });
 
   const useCreateMemberAdmin = () => useMutation({
-    mutationFn: async (data: any) => api.members.createAdmin(data, await getToken()),
+    mutationFn: async (data: any) => api.members.createAdmin(data, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateMembers();
       toast.success('Member profile created successfully');
@@ -42,8 +42,7 @@ export const useMembers = () => {
   const useCreateMember = () => useMutation({
 
     mutationFn: async (data: any) => {
-      const token = await getToken();
-      return api.members.create(data, token);
+      return api.members.create(data, await requireAuthToken(getToken));
     },
     onSuccess: () => {
       invalidateMembers();
@@ -53,7 +52,7 @@ export const useMembers = () => {
   });
 
   const useUpdateMember = () => useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => api.members.update(id, data, await getToken()),
+    mutationFn: async ({ id, data }: { id: string; data: any }) => api.members.update(id, data, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateMembers();
       toast.success('Member updated successfully');
@@ -62,7 +61,7 @@ export const useMembers = () => {
   });
 
   const useActivateMember = () => useMutation({
-    mutationFn: async ({ id, data }: { id: string; data?: any }) => api.members.activate(id, data, await getToken()),
+    mutationFn: async ({ id, data }: { id: string; data?: any }) => api.members.activate(id, data, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateMembers();
       toast.success('Member profile activated');
@@ -71,7 +70,7 @@ export const useMembers = () => {
   });
 
   const useSuspendMember = () => useMutation({
-    mutationFn: async (id: string) => api.members.suspend(id, await getToken()),
+    mutationFn: async (id: string) => api.members.suspend(id, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateMembers();
       toast.success('Member suspended');
@@ -80,7 +79,7 @@ export const useMembers = () => {
   });
 
   const useRemoveMember = () => useMutation({
-    mutationFn: async (id: string) => api.members.remove(id, await getToken()),
+    mutationFn: async (id: string) => api.members.remove(id, await requireAuthToken(getToken)),
     onSuccess: () => {
       invalidateMembers();
       toast.success('Member removed');
@@ -98,8 +97,7 @@ export const useMembers = () => {
         fetchOptions: { throw: true },
       });
 
-      const token = await getToken();
-      return api.members.updateProfile({ phone: phone.trim() }, token);
+      return api.members.updateProfile({ phone: phone.trim() }, await requireAuthToken(getToken));
     },
     onSuccess: async () => {
       await refreshUser();
@@ -110,7 +108,7 @@ export const useMembers = () => {
   });
 
   const useUpdateMembership = () => useMutation({
-    mutationFn: async (data: { action: 'cancel' | 'resume' | 'freeze' | 'unfreeze'; months?: number }) => api.members.updateMembership(data, await getToken()),
+    mutationFn: async (data: { action: 'cancel' | 'resume' | 'freeze' | 'unfreeze'; months?: number }) => api.members.updateMembership(data, await requireAuthToken(getToken)),
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['members', 'me'] });
       await refreshUser();
@@ -120,7 +118,7 @@ export const useMembers = () => {
   });
 
   const useSyncMember = () => useMutation({
-    mutationFn: async () => api.sync(await getToken() as string),
+    mutationFn: async () => api.sync(await requireAuthToken(getToken)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['members', 'me'] }),
   });
 
