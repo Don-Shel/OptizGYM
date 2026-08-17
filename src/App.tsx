@@ -32,6 +32,7 @@ const Progress = lazy(() => import("./pages/dashboard/Progress"));
 
 // Admin pages
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
 const AdminMembers = lazy(() => import("./pages/admin/AdminMembers"));
 const AdminClasses = lazy(() => import("./pages/admin/AdminClasses"));
 const AdminTrainers = lazy(() => import("./pages/admin/AdminTrainers"));
@@ -137,7 +138,7 @@ const AppRoutes = () => (
       <Route path="/admin/classes" element={<ProtectedRoute adminOnly><AdminClasses /></ProtectedRoute>} />
       <Route path="/admin/trainers" element={<ProtectedRoute adminOnly><AdminTrainers /></ProtectedRoute>} />
       <Route path="/admin/payments" element={<ProtectedRoute adminOnly><AdminPayments /></ProtectedRoute>} />
-      <Route path="/admin/analytics" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/analytics" element={<ProtectedRoute adminOnly><AdminAnalytics /></ProtectedRoute>} />
 
       {/* ── Fallback ── */}
       <Route path="*" element={<NotFound />} />

@@ -22,12 +22,15 @@ const memberNav: NavItem[] = [
   { label: "Workout Log", path: "/dashboard/progress", icon: Activity },
 ];
 
-const adminNav: NavItem[] = [
-  { label: "Admin Overview", path: "/admin", icon: Shield },
+const adminManagementNav: NavItem[] = [
+  { label: "Operations", path: "/admin", icon: Shield },
   { label: "Members", path: "/admin/members", icon: Users },
   { label: "Classes", path: "/admin/classes", icon: BookOpen },
   { label: "Trainers", path: "/admin/trainers", icon: Dumbbell },
   { label: "Payments", path: "/admin/payments", icon: CreditCard },
+];
+
+const adminReportingNav: NavItem[] = [
   { label: "Analytics", path: "/admin/analytics", icon: BarChart3 },
 ];
 
@@ -100,9 +103,15 @@ const DashboardSidebar = ({ collapsed, onToggle, mobileOpen, onMobileClose }: Da
         {isAdmin && (
           <>
             {!collapsed && (
-              <p className="px-3 mt-4 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Admin</p>
+              <p className="px-3 mt-4 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Operations</p>
             )}
-            {adminNav.map((item) => (
+            {adminManagementNav.map((item) => (
+              <NavLink key={item.path} item={item} collapsed={collapsed} active={location.pathname === item.path} />
+            ))}
+            {!collapsed && (
+              <p className="px-3 mt-4 mb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reporting</p>
+            )}
+            {adminReportingNav.map((item) => (
               <NavLink key={item.path} item={item} collapsed={collapsed} active={location.pathname === item.path} />
             ))}
           </>

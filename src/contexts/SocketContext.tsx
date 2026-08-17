@@ -20,11 +20,13 @@ const invalidateResource = (queryClient: ReturnType<typeof useQueryClient>, even
       queryClient.invalidateQueries({ queryKey: ['members'] });
       queryClient.invalidateQueries({ queryKey: ['members', 'me'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'analytics'] });
       break;
     case 'classes':
       queryClient.invalidateQueries({ queryKey: ['classes'] });
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'analytics'] });
       break;
     case 'trainers':
       queryClient.invalidateQueries({ queryKey: ['instructors'] });
@@ -35,18 +37,21 @@ const invalidateResource = (queryClient: ReturnType<typeof useQueryClient>, even
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['classes'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'analytics'] });
       break;
     case 'payments':
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['payments', 'admin'] });
       queryClient.invalidateQueries({ queryKey: ['members', 'me'] });
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'analytics'] });
       break;
     case 'notifications':
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       break;
     case 'stats':
       queryClient.invalidateQueries({ queryKey: ['admin', 'stats'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'analytics'] });
       break;
     default:
       queryClient.invalidateQueries();

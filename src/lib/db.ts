@@ -149,5 +149,6 @@ export const api = {
 
   admin: {
     getStats: async (token: string | null) => request('/stats', { headers: getHeaders(token) }, 'Failed to fetch admin stats'),
+    getAnalytics: async (token: string | null) => request('/analytics', { headers: getHeaders(token) }, 'Failed to fetch admin analytics'),
   },
 };
