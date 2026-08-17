@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { authClient, getAuthToken } from '@/lib/neon';
 import { API_BASE } from '@/lib/db';
 import { toast } from 'sonner';
+import type { ProfilePreferences } from '@/types/profile';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export interface User {
   avatar?: string;
   membershipStatus: 'active' | 'expired' | 'pending';
   expiresAt?: string;
+  preferences?: ProfilePreferences;
 }
 
 interface AuthContextType {
@@ -61,6 +63,7 @@ function mapMember(data: any): User {
     memberSince: data.joinedAt,
     membershipStatus: data.membershipStatus,
     expiresAt: data.expiresAt,
+    preferences: data.profilePreferences || data.profile_preferences || undefined,
   };
 }
 

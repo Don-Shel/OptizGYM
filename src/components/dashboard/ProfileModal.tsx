@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Mail, ShieldCheck, UserRound } from 'lucide-react';
+import { CheckCircle2, Clock3, Mail, ShieldCheck, Target, UserRound } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useMembers } from '@/hooks/api/useMembers';
 import type { User } from '@/contexts/AuthContext';
+import { DEFAULT_PROFILE_PREFERENCES, type ProfilePreferences } from '@/types/profile';
 
 interface ProfileModalProps {
   user: User;
@@ -15,17 +16,23 @@ const ProfileModal = ({ user, open, onOpenChange }: ProfileModalProps) => {
   const updateProfile = useUpdateProfile();
   const [fullName, setFullName] = useState(user.fullName || '');
   const [phone, setPhone] = useState('');
+  const [preferences, setPreferences] = useState<ProfilePreferences>(DEFAULT_PROFILE_PREFERENCES);
 
   useEffect(() => {
     if (!open) return;
     setFullName(user.fullName || '');
     setPhone(user.phone || '');
-  }, [open, user.fullName, user.phone]);
+    setPreferences({ ...DEFAULT_PROFILE_PREFERENCES, ...(user.preferences || {}) });
+  }, [open, user.fullName, user.phone, user.preferences]);
+
+  const updatePreference = <K extends keyof ProfilePreferences>(key: K, value: ProfilePreferences[K]) => {
+    setPreferences((current) => ({ ...current, [key]: value }));
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     updateProfile.mutate(
-      { fullName, phone },
+      { fullName, phone, preferences },
       { onSuccess: () => onOpenChange(false) },
     );
   };
@@ -35,11 +42,9 @@ const ProfileModal = ({ user, open, onOpenChange }: ProfileModalProps) => {
       <DialogContent className="z-[1000] max-h-[90vh] max-w-lg overflow-y-auto border-border bg-card p-0">
         <div className="border-b border-border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent px-6 pb-6 pt-7">
           <DialogHeader>
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-              <UserRound className="h-7 w-7" />
-            </div>
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary"><UserRound className="h-7 w-7" /></div>
             <DialogTitle className="text-xl font-bold text-foreground">Profile & settings</DialogTitle>
-            <DialogDescription className="text-sm leading-6 text-muted-foreground">Keep your member profile current so class bookings and gym updates reach you correctly.</DialogDescription>
+            <DialogDescription className="text-sm leading-6 text-muted-foreground">Manage your contact details, fitness goals, preferred training time, and dashboard alerts.</DialogDescription>
           </DialogHeader>
         </div>
 
@@ -51,13 +56,28 @@ const ProfileModal = ({ user, open, onOpenChange }: ProfileModalProps) => {
             <label className="block space-y-1.5"><span className="text-xs font-semibold text-muted-foreground">Phone number <span className="font-normal">(optional)</span></span><input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+254 700 000 000" className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none transition focus:border-primary/60" /></label>
           </section>
 
+          <section className="space-y-4 rounded-2xl border border-border bg-background/50 p-4">
+            <div className="flex items-center gap-2"><Target className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold text-foreground">Fitness preferences</h3></div>
+            <label className="block space-y-1.5"><span className="text-xs font-semibold text-muted-foreground">Primary fitness goal</span><select value={preferences.fitnessGoal} onChange={(event) => updatePreference('fitnessGoal', event.target.value as ProfilePreferences['fitnessGoal'])} className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary/60"><option value="general">General fitness</option><option value="strength">Build strength</option><option value="weight_loss">Weight management</option><option value="endurance">Improve endurance</option><option value="mobility">Mobility and flexibility</option></select></label>
+            <label className="block space-y-1.5"><span className="flex items-center gap-2 text-xs font-semibold text-muted-foreground"><Clock3 className="h-3.5 w-3.5" />Preferred workout time</span><select value={preferences.preferredWorkoutTime} onChange={(event) => updatePreference('preferredWorkoutTime', event.target.value as ProfilePreferences['preferredWorkoutTime'])} className="w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground outline-none focus:border-primary/60"><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></label>
+          </section>
+
+          <section className="space-y-3 rounded-2xl border border-border bg-background/50 p-4">
+            <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold text-foreground">Notification preferences</h3></div>
+            {([
+              ['classReminders', 'Class reminders', 'Receive reminders about bookings and schedule changes.'],
+              ['paymentAlerts', 'Payment alerts', 'Receive payment confirmations, reminders, and membership updates.'],
+              ['activityUpdates', 'Activity updates', 'Receive updates about workouts, goals, and account activity.'],
+            ] as const).map(([key, label, description]) => <label key={key} className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-card px-3 py-3"><input type="checkbox" checked={preferences[key]} onChange={(event) => updatePreference(key, event.target.checked)} className="mt-0.5 h-4 w-4 accent-primary" /><span><span className="block text-sm font-medium text-foreground">{label}</span><span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{description}</span></span></label>)}
+          </section>
+
           <section className="space-y-3 rounded-2xl border border-border bg-background/50 p-4">
             <div className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold text-foreground">Account settings</h3></div>
             <div className="grid gap-3 sm:grid-cols-2"><div><p className="text-[11px] text-muted-foreground">Email verification</p><p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-foreground">{user.isEmailVerified ? <><CheckCircle2 className="h-4 w-4 text-emerald-400" /> Verified</> : 'Pending verification'}</p></div><div><p className="text-[11px] text-muted-foreground">Membership</p><p className="mt-1 text-sm font-medium capitalize text-foreground">{user.plan} · {user.membershipStatus}</p></div></div>
             <p className="text-xs leading-5 text-muted-foreground">Your email, membership, and access role are protected account settings. Contact gym support if you need to change them.</p>
           </section>
 
-          <div className="flex gap-3"><button type="button" onClick={() => onOpenChange(false)} className="flex-1 rounded-xl border border-border py-3 text-sm font-medium text-foreground transition hover:bg-accent">Cancel</button><button type="submit" disabled={updateProfile.isPending} className="flex-1 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">{updateProfile.isPending ? 'Saving…' : 'Save profile'}</button></div>
+          <div className="flex gap-3"><button type="button" onClick={() => onOpenChange(false)} className="flex-1 rounded-xl border border-border py-3 text-sm font-medium text-foreground transition hover:bg-accent">Cancel</button><button type="submit" disabled={updateProfile.isPending} className="flex-1 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60">{updateProfile.isPending ? 'Saving…' : 'Save profile & settings'}</button></div>
         </form>
       </DialogContent>
     </Dialog>

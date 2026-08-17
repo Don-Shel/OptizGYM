@@ -6,6 +6,14 @@ export const membershipStatusEnum = pgEnum('membership_status', ['active', 'pend
 export const difficultyEnum = pgEnum('difficulty', ['beginner', 'intermediate', 'advanced']);
 export const roleEnum = pgEnum('role', ['member', 'admin']);
 
+export type MemberProfilePreferences = {
+  fitnessGoal?: 'strength' | 'weight_loss' | 'endurance' | 'mobility' | 'general';
+  preferredWorkoutTime?: 'morning' | 'afternoon' | 'evening';
+  classReminders?: boolean;
+  paymentAlerts?: boolean;
+  activityUpdates?: boolean;
+};
+
 // ── Members ──
 export const members = pgTable('members', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -15,6 +23,7 @@ export const members = pgTable('members', {
   isEmailVerified: integer('is_email_verified').default(0), // 0 for false, 1 for true
   fullName: text('full_name'),
   phone: text('phone'),
+  profilePreferences: jsonb('profile_preferences').$type<MemberProfilePreferences>().default({}),
   role: roleEnum('role').default('member'),
   plan: planEnum('plan').default('free'),
   planBilling: billingEnum('plan_billing').default('monthly'),

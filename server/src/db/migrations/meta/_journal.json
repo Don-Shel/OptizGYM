@@ -50,6 +50,13 @@
       "when": 1776349000000,
       "tag": "0006_add_class_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1776350000000,
+      "tag": "0007_add_profile_preferences",
+      "breakpoints": true
     }
   ]
 }

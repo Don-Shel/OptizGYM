@@ -138,11 +138,17 @@ export const updateMyProfile = async (req: any, res: Response) => {
   try {
     if (!req.member) return errorResponse(res, 'Member profile not found', 404);
 
+    const nextPreferences = req.body.preferences
+      ? { ...(req.member.profilePreferences || {}), ...req.body.preferences }
+      : undefined;
+    const updateData: Record<string, unknown> = {
+      phone: String(req.body.phone ?? '').trim() || null,
+      updatedAt: new Date(),
+    };
+    if (nextPreferences) updateData.profilePreferences = nextPreferences;
+
     const [updated] = await db.update(members)
-      .set({
-        phone: String(req.body.phone ?? '').trim() || null,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(eq(members.id, req.member.id), isNull(members.deletedAt)))
       .returning();
 

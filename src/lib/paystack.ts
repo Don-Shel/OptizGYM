@@ -42,19 +42,19 @@ export const initializePaystackPayment = (options: PaystackOptions) => {
 
 const PRODUCTION_PLAN_PRICES = {
   free: { monthly: 0, yearly: 0 },
-  basic: { monthly: 2, yearly: 15000 },
-  pro: { monthly: 3, yearly: 35000 },
-  elite: { monthly: 4, yearly: 75000 },
+  basic: { monthly: 1500, yearly: 15000 },
+  pro: { monthly: 3500, yearly: 35000 },
+  elite: { monthly: 7500, yearly: 75000 },
 } as const;
 
-// Test-mode checkout uses a small real KES amount so Paystack test transactions
-// can be completed without charging production membership prices. Enable with
+// Test mode intentionally mirrors the original membership amounts so checkout
+// and server-side verification remain consistent. Enable with
 // VITE_PAYMENT_TEST_MODE=true in the frontend test deployment.
 const TEST_PLAN_PRICES = {
   free: { monthly: 0, yearly: 0 },
-  basic: { monthly: 2, yearly: 5 },
-  pro: { monthly: 3, yearly: 5 },
-  elite: { monthly: 4, yearly: 5 },
+  basic: { monthly: 1500, yearly: 15000 },
+  pro: { monthly: 3500, yearly: 35000 },
+  elite: { monthly: 7500, yearly: 75000 },
 } as const;
 
 const useTestPricing = import.meta.env.VITE_PAYMENT_TEST_MODE === 'true' || import.meta.env.MODE === 'test';

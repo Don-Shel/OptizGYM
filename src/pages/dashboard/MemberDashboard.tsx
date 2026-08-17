@@ -30,8 +30,12 @@ const MemberDashboard = () => {
 
   const isLoading = isBookingsLoading || isWorkoutsLoading || isPaymentsLoading;
 
+  const now = Date.now();
   const upcomingClasses = bookings
-    .filter((booking: any) => booking.status === 'confirmed' && booking.schedule && new Date(booking.schedule) >= new Date())
+    .filter((booking: any) => {
+      const scheduleTime = booking.schedule ? new Date(booking.schedule).getTime() : Number.NaN;
+      return booking.status === 'confirmed' && Number.isFinite(scheduleTime) && scheduleTime >= now;
+    })
     .sort((a: any, b: any) => new Date(a.schedule).getTime() - new Date(b.schedule).getTime())
     .slice(0, 3);
   const recentWorkouts = workouts.slice(0, 3);

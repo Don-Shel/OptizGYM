@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/db';
 import { authClient } from '@/lib/neon';
+import type { ProfilePreferences } from '@/types/profile';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { requireAuthToken } from './requireAuthToken';
@@ -88,7 +89,7 @@ export const useMembers = () => {
   });
 
   const useUpdateProfile = () => useMutation({
-    mutationFn: async ({ fullName, phone }: { fullName: string; phone: string }) => {
+    mutationFn: async ({ fullName, phone, preferences }: { fullName: string; phone: string; preferences: ProfilePreferences }) => {
       const normalizedName = fullName.trim();
       if (normalizedName.length < 2) throw new Error('Full name must be at least 2 characters');
 
@@ -97,7 +98,7 @@ export const useMembers = () => {
         fetchOptions: { throw: true },
       });
 
-      return api.members.updateProfile({ phone: phone.trim() }, await requireAuthToken(getToken));
+      return api.members.updateProfile({ phone: phone.trim(), preferences }, await requireAuthToken(getToken));
     },
     onSuccess: async () => {
       await refreshUser();

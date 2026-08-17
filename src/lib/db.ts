@@ -29,6 +29,11 @@ const unwrap = async (res: Response, fallbackMsg = 'Request failed'): Promise<an
   return body.data !== undefined ? body.data : body;
 };
 
+export interface ProfileUpdatePayload {
+  phone: string;
+  preferences?: import('@/types/profile').ProfilePreferences;
+}
+
 const request = async (path: string, init: RequestInit = {}, fallbackMsg?: string) => {
   const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'include',
@@ -46,7 +51,7 @@ export const api = {
   members: {
     getAll: async (token?: string | null) => request('/members', { headers: getHeaders(token) }, 'Failed to fetch members'),
     getMe: async (token: string) => request('/members/me', { headers: getHeaders(token) }, 'Failed to fetch profile'),
-    updateProfile: async (data: { phone: string }, token: string | null) => request('/members/me/profile', {
+    updateProfile: async (data: ProfileUpdatePayload, token: string | null) => request('/members/me/profile', {
       method: 'PATCH', headers: getHeaders(token), body: JSON.stringify(data),
     }, 'Failed to update profile'),
     updateMembership: async (data: any, token?: string | null) => request('/members/me/membership', {
@@ -136,6 +141,9 @@ export const api = {
     markRead: async (id: string, token: string | null) => request(`/notifications/${id}/read`, {
       method: 'PATCH', headers: getHeaders(token),
     }, 'Failed to mark notification as read'),
+    markAllRead: async (token: string | null) => request('/notifications/read-all', {
+      method: 'PATCH', headers: getHeaders(token),
+    }, 'Failed to mark notifications as read'),
   },
 
   trainers: {

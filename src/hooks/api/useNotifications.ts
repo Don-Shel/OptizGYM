@@ -14,6 +14,12 @@ export const useNotifications = () => {
     staleTime: 30_000,
   });
 
+  const markAllRead = useMutation({
+    mutationFn: async () => api.notifications.markAllRead(await getToken()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] }),
+    onError: (error: any) => toast.error(error.message || 'Failed to mark notifications as read'),
+  });
+
   const markRead = useMutation({
     mutationFn: async (id: string) => api.notifications.markRead(id, await getToken()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] }),
@@ -23,5 +29,5 @@ export const useNotifications = () => {
   const notifications = (query.data || []) as Array<any>;
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
 
-  return { ...query, notifications, unreadCount, markRead };
+  return { ...query, notifications, unreadCount, markRead, markAllRead };
 };

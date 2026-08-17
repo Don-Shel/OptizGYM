@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/api/useNotifications";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getNotificationDestination } from "@/lib/notifications";
 import ProfileModal from "./ProfileModal";
 
 interface DashboardLayoutProps {
@@ -21,8 +22,18 @@ const DashboardLayout = ({ children, title, subtitle }: DashboardLayoutProps) =>
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const { user, isLoaded, isSignedIn, syncError, refreshUser } = useAuth();
-  const { notifications, unreadCount, markRead, isLoading: notificationsLoading } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead, isLoading: notificationsLoading } = useNotifications();
   const navigate = useNavigate();
+
+  const handleNotificationClick = async (notification: any) => {
+    try {
+      if (!notification.isRead) await markRead.mutateAsync(notification.id);
+      setNotificationsOpen(false);
+      navigate(getNotificationDestination(notification));
+    } catch {
+      // The mutation already presents an error toast; keep the modal open for retry.
+    }
+  };
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) navigate("/sign-in");
@@ -55,8 +66,8 @@ const DashboardLayout = ({ children, title, subtitle }: DashboardLayoutProps) =>
               {notificationsOpen && createPortal(<>
                 <button aria-label="Close notifications" className="fixed inset-0 z-[9999] cursor-default" onClick={() => setNotificationsOpen(false)} />
                 <motion.div initial={{ opacity: 0, y: -6, scale: .98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="fixed right-4 top-[4.5rem] z-[10000] w-[min(calc(100vw-2rem),360px)] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3"><div><p className="text-sm font-semibold text-foreground">Notifications</p><p className="text-[11px] text-muted-foreground">Live updates from OptizGYM</p></div>{unreadCount > 0 && <span className="text-[11px] font-semibold text-primary">{unreadCount} unread</span>}</div>
-                  <div className="max-h-80 overflow-y-auto">{notificationsLoading ? <div className="p-6 text-center text-xs text-muted-foreground">Loading notifications…</div> : notifications.length === 0 ? <div className="p-6 text-center text-xs text-muted-foreground">You’re all caught up.</div> : notifications.slice(0, 12).map((notification: any) => <button key={notification.id} onClick={() => { if (!notification.isRead) markRead.mutate(notification.id); }} className={cn("w-full border-b border-border/50 px-4 py-3 text-left transition-colors hover:bg-accent/40", !notification.isRead && "bg-primary/5")}><div className="flex gap-3"><div className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", notification.isRead ? "bg-muted" : "bg-primary")} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-foreground">{notification.title}</p>{notification.isRead ? <Check className="h-3 w-3 text-muted-foreground" /> : <span className="text-[10px] text-muted-foreground">New</span>}</div><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{notification.message}</p><p className="mt-2 text-[10px] text-muted-foreground/70">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : ''}</p></div></div></button>)}</div>
+                  <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3"><div><p className="text-sm font-semibold text-foreground">Notifications</p><p className="text-[11px] text-muted-foreground">Live updates from OptizGYM</p></div><div className="flex items-center gap-2">{unreadCount > 0 && <><span className="text-[11px] font-semibold text-primary">{unreadCount} unread</span><button type="button" onClick={() => markAllRead.mutate()} disabled={markAllRead.isPending} className="text-[10px] font-semibold text-primary underline-offset-2 hover:underline disabled:opacity-50">{markAllRead.isPending ? 'Marking…' : 'Mark all as read'}</button></>}</div></div>
+                  <div className="max-h-80 overflow-y-auto">{notificationsLoading ? <div className="p-6 text-center text-xs text-muted-foreground">Loading notifications…</div> : notifications.length === 0 ? <div className="p-6 text-center text-xs text-muted-foreground">You’re all caught up.</div> : notifications.slice(0, 12).map((notification: any) => <button key={notification.id} type="button" onClick={() => handleNotificationClick(notification)} className={cn("w-full border-b border-border/50 px-4 py-3 text-left transition-colors hover:bg-accent/40", !notification.isRead && "bg-primary/5")}><div className="flex gap-3"><div className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", notification.isRead ? "bg-muted" : "bg-primary")} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className="text-xs font-semibold text-foreground">{notification.title}</p>{notification.isRead ? <Check className="h-3 w-3 text-muted-foreground" /> : <span className="text-[10px] text-muted-foreground">New</span>}</div><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{notification.message}</p><p className="mt-2 text-[10px] text-muted-foreground/70">{notification.createdAt ? new Date(notification.createdAt).toLocaleString() : ''}</p></div><ExternalLink className="mt-1 h-3 w-3 shrink-0 text-muted-foreground" /></div></button>)}</div>
                   <button onClick={() => navigate('/dashboard/classes')} className="flex w-full items-center justify-center gap-1 border-t border-border px-4 py-3 text-xs font-semibold text-primary hover:bg-primary/5">Explore classes <ExternalLink className="h-3 w-3" /></button>
                 </motion.div>
                 </>, document.body)}
