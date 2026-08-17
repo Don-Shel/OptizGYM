@@ -149,6 +149,33 @@ export const api = {
 
   admin: {
     getStats: async (token: string | null) => request('/stats', { headers: getHeaders(token) }, 'Failed to fetch admin stats'),
-    getAnalytics: async (token: string | null) => request('/analytics', { headers: getHeaders(token) }, 'Failed to fetch admin analytics'),
+    getAnalytics: async (token: string | null) => {
+      try {
+        return await request('/analytics', { headers: getHeaders(token) }, 'Failed to fetch admin analytics');
+      } catch (error) {
+        // Keep the reporting page usable during a rolling Render deployment where
+        // an older API instance may not yet expose the dedicated endpoint.
+        if (!(error instanceof Error) || !error.message.includes('(404)')) throw error;
+        const legacyStats = await request('/stats', { headers: getHeaders(token) }, 'Failed to fetch admin stats');
+        return {
+          legacyFallback: true,
+          summary: {
+            totalMembers: Number(legacyStats.totalMembers || 0),
+            activeMembers: Number(legacyStats.activeMembers || 0),
+            totalRevenue: Number(legacyStats.monthlyRevenue || 0),
+            confirmedBookings: Number(legacyStats.monthlyBookings || 0),
+            newMembersThisMonth: 0,
+            averageUtilization: Number(legacyStats.attendanceRate || 0),
+          },
+          bookingTrend: [],
+          membershipGrowth: [],
+          revenueByPlan: [],
+          capacityUtilization: [],
+          membershipStatus: [],
+          paymentStatus: [],
+          bookingStatus: [],
+        };
+      }
+    },
   },
 };

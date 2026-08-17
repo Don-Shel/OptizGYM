@@ -85,6 +85,7 @@ const AdminAnalytics = () => {
   }
 
   const summary = data?.summary || {};
+  const legacyFallback = Boolean(data?.legacyFallback);
   const bookingTrend = data?.bookingTrend || [];
   const membershipGrowth = data?.membershipGrowth || [];
   const revenueByPlan = data?.revenueByPlan || [];
@@ -108,6 +109,12 @@ const AdminAnalytics = () => {
           </div>
         </div>
       </motion.section>
+
+      {legacyFallback && (
+        <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
+          The dedicated analytics API is still rolling out on the server. Showing a safe operational summary temporarily; detailed trend reports will appear automatically once the deployment finishes.
+        </div>
+      )}
 
       <div className="mb-8 grid grid-cols-2 gap-4 xl:grid-cols-5">
         <StatCard title="Total Revenue" value={formatCurrency(summary.totalRevenue)} subtitle="All paid transactions" icon={CreditCard} accent index={0} />
