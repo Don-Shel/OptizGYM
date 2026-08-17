@@ -226,58 +226,68 @@ export const getStats = async (_req: Request, res: Response) => {
 
 
 export const getAnalytics = async (_req: Request, res: Response) => {
+  const failedQueries: string[] = [];
+  const safeQuery = async (label: string, query: Promise<any[]>, fallback: any[] = []) => {
+    try {
+      return await query;
+    } catch (error) {
+      failedQueries.push(label);
+      logger.error(`[ANALYTICS] ${label} query failed`, error);
+      return fallback;
+    }
+  };
+
   try {
     const [summary, bookingTrend, membershipGrowth, revenueByPlan, capacityUtilization, membershipStatus, paymentStatus, bookingStatus] = await Promise.all([
-      sql`SELECT
+      safeQuery('summary', sql`SELECT
             (SELECT count(*)::int FROM members WHERE deleted_at IS NULL) AS total_members,
             (SELECT count(*)::int FROM members WHERE deleted_at IS NULL AND membership_status = 'active') AS active_members,
             (SELECT COALESCE(sum(amount), 0) FROM payments WHERE status = 'paid') AS total_revenue,
             (SELECT count(*)::int FROM bookings WHERE status = 'confirmed') AS confirmed_bookings,
             (SELECT count(*)::int FROM members WHERE deleted_at IS NULL AND joined_at >= date_trunc('month', now())) AS new_members_this_month,
-            (SELECT COALESCE(avg(CASE WHEN capacity > 0 THEN enrolled::numeric / capacity * 100 ELSE 0 END), 0) FROM classes WHERE deleted_at IS NULL AND schedule >= now()) AS average_utilization`,
-      sql`SELECT to_char(date_trunc('month', booked_at), 'Mon') AS month,
+            (SELECT COALESCE(avg(CASE WHEN capacity > 0 THEN enrolled::numeric / capacity * 100 ELSE 0 END), 0) FROM classes WHERE deleted_at IS NULL AND schedule >= now()) AS average_utilization`, [ {} ]),
+      safeQuery('bookingTrend', sql`SELECT to_char(date_trunc('month', booked_at), 'Mon') AS month,
                  count(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
                  count(*) FILTER (WHERE status = 'cancelled')::int AS cancelled
           FROM bookings
           WHERE booked_at >= date_trunc('month', now()) - interval '5 months'
           GROUP BY date_trunc('month', booked_at)
-          ORDER BY date_trunc('month', booked_at)`,
-      sql`SELECT to_char(date_trunc('month', joined_at), 'Mon') AS month,
+          ORDER BY date_trunc('month', booked_at)`, []),
+      safeQuery('membershipGrowth', sql`SELECT to_char(date_trunc('month', joined_at), 'Mon') AS month,
                  count(*)::int AS new_members
           FROM members
           WHERE deleted_at IS NULL
             AND joined_at >= date_trunc('month', now()) - interval '5 months'
           GROUP BY date_trunc('month', joined_at)
-          ORDER BY date_trunc('month', joined_at)`,
-      sql`SELECT COALESCE(plan, 'free') AS plan,
+          ORDER BY date_trunc('month', joined_at)`, []),
+      safeQuery('revenueByPlan', sql`SELECT COALESCE(plan, 'free') AS plan,
                  count(*)::int AS transactions,
                  COALESCE(sum(amount), 0) AS revenue
           FROM payments
           WHERE status = 'paid'
           GROUP BY COALESCE(plan, 'free')
-          ORDER BY revenue DESC`,
-      sql`SELECT id, name, schedule, capacity, enrolled,
-                 round(CASE WHEN capacity > 0 THEN enrolled::numeric / capacity * 100 ELSE 0 END, 1) AS utilization
+          ORDER BY revenue DESC`, []),
+      safeQuery('capacityUtilization', sql`SELECT id, name, schedule, capacity, enrolled
           FROM classes
           WHERE deleted_at IS NULL
             AND schedule >= now()
-          ORDER BY utilization DESC, schedule ASC
-          LIMIT 12`,
-      sql`SELECT COALESCE(membership_status, 'unknown') AS status, count(*)::int AS count
+          ORDER BY enrolled DESC, schedule ASC
+          LIMIT 12`, []),
+      safeQuery('membershipStatus', sql`SELECT COALESCE(membership_status, 'unknown') AS status, count(*)::int AS count
           FROM members
           WHERE deleted_at IS NULL
           GROUP BY COALESCE(membership_status, 'unknown')
-          ORDER BY count DESC`,
-      sql`SELECT COALESCE(status, 'unknown') AS status,
+          ORDER BY count DESC`, []),
+      safeQuery('paymentStatus', sql`SELECT COALESCE(status, 'unknown') AS status,
                  count(*)::int AS count,
                  COALESCE(sum(amount), 0) AS amount
           FROM payments
           GROUP BY COALESCE(status, 'unknown')
-          ORDER BY count DESC`,
-      sql`SELECT COALESCE(status, 'unknown') AS status, count(*)::int AS count
+          ORDER BY count DESC`, []),
+      safeQuery('bookingStatus', sql`SELECT COALESCE(status, 'unknown') AS status, count(*)::int AS count
           FROM bookings
           GROUP BY COALESCE(status, 'unknown')
-          ORDER BY count DESC`,
+          ORDER BY count DESC`, []),
     ]);
 
     const summaryRow = summary[0] || {};
@@ -305,17 +315,22 @@ export const getAnalytics = async (_req: Request, res: Response) => {
         transactions: Number(row.transactions || 0),
         revenue: Number(row.revenue || 0),
       })),
-      capacityUtilization: capacityUtilization.map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        schedule: row.schedule,
-        capacity: Number(row.capacity || 0),
-        enrolled: Number(row.enrolled || 0),
-        utilization: Number(row.utilization || 0),
-      })),
+      capacityUtilization: capacityUtilization.map((row: any) => {
+        const capacity = Number(row.capacity || 0);
+        const enrolled = Number(row.enrolled || 0);
+        return {
+          id: row.id,
+          name: row.name,
+          schedule: row.schedule,
+          capacity,
+          enrolled,
+          utilization: capacity > 0 ? Math.round((enrolled / capacity) * 1000) / 10 : 0,
+        };
+      }),
       membershipStatus: membershipStatus.map((row: any) => ({ status: row.status, count: Number(row.count || 0) })),
       paymentStatus: paymentStatus.map((row: any) => ({ status: row.status, count: Number(row.count || 0), amount: Number(row.amount || 0) })),
       bookingStatus: bookingStatus.map((row: any) => ({ status: row.status, count: Number(row.count || 0) })),
+      meta: { partial: failedQueries.length > 0, failedQueries },
     });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch analytics', 500, error);

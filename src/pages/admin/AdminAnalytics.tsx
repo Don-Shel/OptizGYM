@@ -88,6 +88,7 @@ const AdminAnalytics = () => {
 
   const summary = data?.summary || {};
   const legacyFallback = Boolean(data?.legacyFallback);
+  const partialAnalytics = Boolean(data?.meta?.partial);
   const bookingTrend = data?.bookingTrend || [];
   const membershipGrowth = data?.membershipGrowth || [];
   const revenueByPlan = data?.revenueByPlan || [];
@@ -112,9 +113,11 @@ const AdminAnalytics = () => {
         </div>
       </motion.section>
 
-      {legacyFallback && (
+      {(legacyFallback || partialAnalytics) && (
         <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-200">
-          The dedicated analytics API is still rolling out on the server. Showing a safe operational summary temporarily; detailed trend reports will appear automatically once the deployment finishes.
+          {legacyFallback
+            ? "The dedicated analytics API is still rolling out on the server. Showing a safe operational summary temporarily; detailed trend reports will appear automatically once the deployment finishes."
+            : "Some analytics panels are temporarily unavailable, but the remaining platform data is still being displayed."}
         </div>
       )}
 
