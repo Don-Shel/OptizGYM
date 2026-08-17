@@ -3,26 +3,32 @@ import { api } from '@/lib/db';
 import { useAuth } from '@/contexts/AuthContext';
 
 export const useAdmin = () => {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded, user } = useAuth();
+
+  const getAdminToken = async () => {
+    let token = await getToken();
+    if (!token) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      token = await getToken();
+    }
+    if (!token) throw new Error('Your admin session token is unavailable. Please sign in again.');
+    return token;
+  };
 
   const useStats = () => useQuery({
     queryKey: ['admin', 'stats'],
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Your admin session is not ready. Please sign in again.');
-      return api.admin.getStats(token);
+      return api.admin.getStats(await getAdminToken());
     },
-    enabled: isSignedIn,
+    enabled: isLoaded && isSignedIn && user?.role === 'admin',
   });
 
   const useAnalytics = () => useQuery({
     queryKey: ['admin', 'analytics'],
     queryFn: async () => {
-      const token = await getToken();
-      if (!token) throw new Error('Your admin session is not ready. Please sign in again.');
-      return api.admin.getAnalytics(token);
+      return api.admin.getAnalytics(await getAdminToken());
     },
-    enabled: isSignedIn,
+    enabled: isLoaded && isSignedIn && user?.role === 'admin',
   });
 
   return {

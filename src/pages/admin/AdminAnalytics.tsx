@@ -72,12 +72,14 @@ const AdminAnalytics = () => {
   }
 
   if (isError) {
+    const errorMessage = error instanceof Error ? error.message : "The analytics service returned an unexpected response.";
+    const authError = errorMessage.includes("401") || errorMessage.toLowerCase().includes("unauthorized") || errorMessage.toLowerCase().includes("token");
     return (
       <DashboardLayout title="Analytics" subtitle="Comprehensive platform reporting">
         <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-10 text-center">
           <AlertCircle className="mx-auto mb-3 h-8 w-8 text-destructive" />
-          <p className="font-semibold text-foreground">Unable to load analytics</p>
-          <p className="mt-1 text-sm text-muted-foreground">{error instanceof Error ? error.message : "The analytics service returned an unexpected response."}</p>
+          <p className="font-semibold text-foreground">{authError ? "Admin session required" : "Unable to load analytics"}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{authError ? "The analytics request requires a valid admin session. Return to the dashboard, sign out, and sign in again if your session has expired." : errorMessage}</p>
           <button onClick={() => refetch()} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Retry</button>
         </div>
       </DashboardLayout>
