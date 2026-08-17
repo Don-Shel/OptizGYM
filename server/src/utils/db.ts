@@ -11,7 +11,7 @@ if (!process.env.DATABASE_URL) {
 
 // Use standard pg Pool for Node.js backend
 // This supports transactions and FOR UPDATE locking natively
-const pool = new pg.Pool({
+export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   // For Neon, SSL is required
   ssl: process.env.DATABASE_URL.includes('sslmode=require') || process.env.NODE_ENV === 'production'
