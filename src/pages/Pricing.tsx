@@ -10,10 +10,10 @@ import { initializePaystackPayment, PLAN_PRICES } from "@/lib/paystack";
 import { toast } from "sonner";
 
 const plans = [
-  { id: "free", name: "Free", desc: "Basic access for those just starting out.", monthly: 0, yearly: 0, features: ["Limited class viewing", "No bookings", "Basic profile tracking"] },
-  { id: "basic", name: "Basic", desc: "Essential access for your daily workout.", monthly: 1500, yearly: 15000, features: ["Gym floor access", "Locker rooms & showers", "Free Wi-Fi"] },
-  { id: "pro", name: "Pro", desc: "Everything you need to level up faster.", monthly: 3500, yearly: 35000, popular: true, extra: "Everything in Basic, plus", features: ["24/7 Gym Access", "Unlimited Group Classes", "Sauna & Steam Room", "2 Guest Passes / Month"] },
-  { id: "elite", name: "Elite", desc: "Maximum results with personal guidance.", monthly: 7500, yearly: 75000, extra: "Everything in Pro, plus", features: ["4 Personal Trainer Sessions", "Custom Nutrition Guide", "Premium Towel Service", "Priority Class Booking"] },
+  { id: "free", name: "Free", desc: "Basic access for those just starting out.", monthly: PLAN_PRICES.free.monthly, yearly: PLAN_PRICES.free.yearly, features: ["Limited class viewing", "No bookings", "Basic profile tracking"] },
+  { id: "basic", name: "Basic", desc: "Essential access for your daily workout.", monthly: PLAN_PRICES.basic.monthly, yearly: PLAN_PRICES.basic.yearly, features: ["Gym floor access", "Locker rooms & showers", "Free Wi-Fi"] },
+  { id: "pro", name: "Pro", desc: "Everything you need to level up faster.", monthly: PLAN_PRICES.pro.monthly, yearly: PLAN_PRICES.pro.yearly, popular: true, extra: "Everything in Basic, plus", features: ["24/7 Gym Access", "Unlimited Group Classes", "Sauna & Steam Room", "2 Guest Passes / Month"] },
+  { id: "elite", name: "Elite", desc: "Maximum results with personal guidance.", monthly: PLAN_PRICES.elite.monthly, yearly: PLAN_PRICES.elite.yearly, extra: "Everything in Pro, plus", features: ["4 Personal Trainer Sessions", "Custom Nutrition Guide", "Premium Towel Service", "Priority Class Booking"] },
 ];
 
 const faqs = [
