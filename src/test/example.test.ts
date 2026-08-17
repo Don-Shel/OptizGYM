@@ -5,13 +5,12 @@ describe("OptizGYM", () => {
     expect(true).toBe(true);
   });
 
-  it("should calculate plan prices correctly", () => {
-    const PLAN_PRICES = {
-      basic: { monthly: 29, yearly: 25 },
-      pro: { monthly: 59, yearly: 50 },
-      elite: { monthly: 99, yearly: 84 },
+  it("should calculate the KES 5 test prices for every paid plan", () => {
+    const TEST_PLAN_PRICES = {
+      basic: { monthly: 5, yearly: 5 },
+      pro: { monthly: 5, yearly: 5 },
+      elite: { monthly: 5, yearly: 5 },
     };
-    expect(PLAN_PRICES.pro.monthly).toBe(59);
-    expect(PLAN_PRICES.elite.yearly).toBe(84);
+    expect(Object.values(TEST_PLAN_PRICES).every((plan) => plan.monthly === 5 && plan.yearly === 5)).toBe(true);
   });
 });
