@@ -28,3 +28,29 @@ npm run build
 ```
 
 The archive intentionally excludes `.env`, `.env.local`, `node_modules`, `dist`, `dist-server`, logs, Playwright reports, and other generated or secret-bearing files.
+
+
+## E2E and staging authentication
+
+Production and staging Neon Auth environments require email verification. The application intentionally does not include a production verification bypass because bypassing email verification would weaken account security.
+
+For browser end-to-end testing, provision one dedicated test account in the Neon Auth environment used by the test deployment:
+
+1. Register a dedicated address such as `optizgym-e2e-<environment>@your-test-domain.example` through `/auth/sign-up`.
+2. Retrieve the six-digit OTP from the controlled test inbox and complete `/auth/verify-email` once.
+3. Sign in with that verified account and confirm the dashboard and sign-out controls are reachable.
+4. Promote the corresponding member profile to administrator only in the non-production test database when admin flow coverage is required. Do not reuse a production owner account for automated tests.
+5. Store the test email and password in the test runner’s secret store or local `.env.test` file. Never place them in `VITE_*` variables, source code, screenshots, or committed files.
+
+When a controlled test inbox is unavailable, the auth-blocked browser flows cannot be completed honestly from the sandbox. The correct resolution is to provide a verified test account or test inbox; the application should not add a production-only OTP bypass.
+
+Recommended non-production test variables are server/test-runner variables only:
+
+```env
+E2E_AUTH_EMAIL=verified-test-account@example.com
+E2E_AUTH_PASSWORD=use-the-secret-store
+E2E_ADMIN_EMAIL=verified-admin-test-account@example.com
+E2E_ADMIN_PASSWORD=use-the-secret-store
+```
+
+These variables are documentation placeholders and must not be added to Vercel frontend environment variables.

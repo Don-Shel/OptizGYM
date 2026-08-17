@@ -68,24 +68,36 @@ const AdminClasses = () => {
   const openAdd = () => { setEditClass({ ...BLANK }); setIsNew(true); };
   const openEdit = (c: any) => { setEditClass({ ...c }); setIsNew(false); };
 
-  const handleSave = () => {
-    if (!editClass?.name) { toast.error("Name is required."); return; }
+  const handleSave = async () => {
+    if (!editClass?.name?.trim()) { toast.error("Name is required."); return; }
     const selectedInstructor = instructors.find((instructor: any) => instructor.fullName === (editClass.instructor || editClass.instructorLegacy));
     const data = {
       ...editClass,
-      instructor: editClass.instructor || editClass.instructorLegacy,
+      name: editClass.name.trim(),
+      instructor: (editClass.instructor || editClass.instructorLegacy || '').trim(),
       instructorId: selectedInstructor?.id || editClass.instructorId || null,
     };
-    if (isNew) {
-      createMutation.mutate(data, { onSuccess: () => setEditClass(null) });
-    } else {
-      updateMutation.mutate({ id: editClass.id!, data }, { onSuccess: () => setEditClass(null) });
+    try {
+      if (isNew) {
+        await createMutation.mutateAsync(data);
+      } else if (editClass.id) {
+        await updateMutation.mutateAsync({ id: editClass.id, data });
+      }
+      setEditClass(null);
+      setIsNew(false);
+    } catch {
+      // The mutation hook surfaces the API validation or server error via toast.
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteId) return;
-    deleteMutation.mutate(deleteId, { onSuccess: () => setDeleteId(null) });
+    try {
+      await deleteMutation.mutateAsync(deleteId);
+      setDeleteId(null);
+    } catch {
+      // The mutation hook surfaces the API error via toast and keeps the dialog open.
+    }
   };
 
   const totalCapacity = classes.reduce((s: number, c: any) => s + c.capacity, 0);

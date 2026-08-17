@@ -43,17 +43,20 @@ export const adminMemberStatusSchema = z.object({
 });
 
 export const classSchema = z.object({
-  name: z.string().min(1),
-  instructor: z.string().min(1),
+  name: z.string().trim().min(1).max(160),
+  instructor: z.string().trim().min(1).max(160),
+  instructorLegacy: z.string().trim().max(160).optional().or(z.literal('')),
+  instructorId: z.string().uuid().nullable().optional(),
   schedule: z.string().datetime(),
   duration_minutes: z.number().int().positive().default(60),
+  durationMinutes: z.number().int().positive().optional(),
   capacity: z.number().int().positive().default(20),
-  category: z.string().optional(),
-  location: z.string().optional(),
-  description: z.string().optional(),
+  category: z.string().trim().max(80).optional(),
+  location: z.string().trim().max(160).optional(),
+  description: z.string().trim().max(1000).optional(),
   difficulty: z.enum(['beginner', 'intermediate', 'advanced']).default('beginner'),
   intensity: z.enum(['low', 'medium', 'high']).default('medium'),
-  requirements: z.string().max(500).optional(),
+  requirements: z.string().trim().max(500).optional(),
 });
 
 export const trainerSchema = z.object({

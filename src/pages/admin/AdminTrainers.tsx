@@ -111,7 +111,7 @@ const AdminTrainers = () => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const fullName = form.fullName.trim();
     const email = form.email.trim().toLowerCase();
@@ -140,16 +140,26 @@ const AdminTrainers = () => {
       avatarUrl: form.avatarUrl.trim(),
     };
 
-    if (editingTrainer) {
-      updateMutation.mutate({ id: editingTrainer.id, data: payload }, { onSuccess: closeEditor });
-    } else {
-      createMutation.mutate(payload, { onSuccess: closeEditor });
+    try {
+      if (editingTrainer) {
+        await updateMutation.mutateAsync({ id: editingTrainer.id, data: payload });
+      } else {
+        await createMutation.mutateAsync(payload);
+      }
+      closeEditor();
+    } catch {
+      // The mutation hook surfaces the API validation or server error via toast.
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteId) return;
-    deleteMutation.mutate(deleteId, { onSuccess: () => setDeleteId(null) });
+    try {
+      await deleteMutation.mutateAsync(deleteId);
+      setDeleteId(null);
+    } catch {
+      // Keep the confirmation dialog open when the delete fails.
+    }
   };
 
   return (

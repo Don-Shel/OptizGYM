@@ -44,7 +44,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const AdminPayments = () => {
   const { getToken } = useAuth();
   const { useAdminPayments, useRetryPayment, useRemindPayment } = usePayments();
-  const { data, isLoading, isError, refetch } = useAdminPayments();
+  const { data, isLoading, isError, error, refetch } = useAdminPayments();
   const retryPayment = useRetryPayment();
   const remindPayment = useRemindPayment();
   const [search, setSearch] = useState('');
@@ -94,7 +94,7 @@ const AdminPayments = () => {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20"><Loader2 className="h-8 w-8 text-primary animate-spin mb-4" /><p className="text-sm text-muted-foreground">Loading live payment data...</p></div>
       ) : isError ? (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center"><p className="text-sm text-destructive mb-4">Unable to load payment data.</p><button onClick={() => refetch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Retry</button></div>
+        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center"><p className="text-sm text-destructive mb-2">Unable to load payment data.</p><p className="mb-4 text-xs text-muted-foreground">{error instanceof Error ? error.message : 'The payment API returned an unexpected response.'}</p><button onClick={() => refetch()} className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Retry</button></div>
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

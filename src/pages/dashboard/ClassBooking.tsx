@@ -62,17 +62,21 @@ const ClassBooking = () => {
     return true;
   });
 
-  const handleBook = (cls: GymClass) => {
+  const handleBook = async (cls: GymClass) => {
     const existingBooking = userBookings.find((booking: any) => booking.classId === cls.id && booking.status === 'confirmed');
-    if (existingBooking) {
-      cancellationMutation.mutate(existingBooking.id, { onSuccess: () => setSelected(null) });
-      return;
+    try {
+      if (existingBooking) {
+        await cancellationMutation.mutateAsync(existingBooking.id);
+      } else {
+        await bookingMutation.mutateAsync({
+          member_id: user?.id,
+          class_id: cls.id,
+        });
+      }
+      setSelected(null);
+    } catch {
+      // The mutation hook displays the API error and keeps the dialog open for retry.
     }
-
-    bookingMutation.mutate({
-      member_id: user?.id,
-      class_id: cls.id,
-    }, { onSuccess: () => setSelected(null) });
   };
 
   return (

@@ -20,11 +20,12 @@ const STATUS_CONFIG: Record<string, any> = {
 };
 
 const Payments = () => {
-  const { user, getToken } = useAuth();
-  const { useMemberPayments } = usePayments();
+  const { user, getToken, refreshUser } = useAuth();
+  const { useMemberPayments, useVerifyPayment } = usePayments();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "paid" | "pending" | "failed">("all");
   const [paying, setPaying] = useState(false);
+  const verifyPayment = useVerifyPayment();
 
   const { data: payments = [], isLoading } = useMemberPayments(user?.id);
 
@@ -39,31 +40,45 @@ const Payments = () => {
   const pending = payments.filter((p: any) => p.status === "pending");
 
   const handlePayNow = () => {
-    if (user?.plan === 'free') {
-      toast.error("Please select a plan in the Membership section first.");
+    if (!user?.email || user.plan === 'free' || !['basic', 'pro', 'elite'].includes(user.plan)) {
+      toast.error("Please select a paid plan in the Membership section first.");
       return;
     }
+    const billing = user.planBilling === 'yearly' ? 'yearly' : 'monthly';
+    const plan = user.plan as 'basic' | 'pro' | 'elite';
+    const amount = PLAN_PRICES[plan][billing];
     setPaying(true);
-    const amount = PLAN_PRICES[(user?.plan || "basic") as keyof typeof PLAN_PRICES][user?.planBilling || "monthly"];
-    initializePaystackPayment({
-      email: user?.email || "",
-      amount,
-      metadata: {
-        type: "renewal",
-        userId: user?.id,
-        auth_user_id: user?.authId,
-        plan: user?.plan,
-        billing: user?.planBilling
-      },
-      onSuccess: (ref) => {
-        setPaying(false);
-        toast.success(`Payment successful! Processing upgrade...`);
-      },
-      onClose: () => {
-        setPaying(false);
-        toast.info("Payment window closed.");
-      },
-    });
+    try {
+      initializePaystackPayment({
+        email: user.email,
+        amount,
+        metadata: {
+          type: "renewal",
+          userId: user.id,
+          auth_user_id: user.authId,
+          plan,
+          billing,
+        },
+        onSuccess: async (ref) => {
+          try {
+            await verifyPayment.mutateAsync({ reference: ref, plan, billing, amount });
+            await refreshUser();
+            toast.success("Payment verified and membership updated.");
+          } catch {
+            // The payment hook surfaces the provider or API error.
+          } finally {
+            setPaying(false);
+          }
+        },
+        onClose: () => {
+          setPaying(false);
+          toast.info("Payment window closed.");
+        },
+      });
+    } catch (error) {
+      setPaying(false);
+      toast.error(error instanceof Error ? error.message : "Unable to open payment checkout");
+    }
   };
 
   const handleDownload = async (payment: any) => {
@@ -268,9 +283,9 @@ const Payments = () => {
             <p className="text-xs text-muted-foreground">Secured via Paystack · •••• •••• •••• 4242</p>
           </div>
         </div>
-        <button onClick={() => toast.info("Redirecting to Paystack billing portal…")}
-          className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors">
-          Update Card
+        <button onClick={handlePayNow} disabled={paying || verifyPayment.isPending}
+          className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:border-primary/30 hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-60">
+          {paying || verifyPayment.isPending ? "Opening…" : "Update Card"}
         </button>
       </motion.div>
     </DashboardLayout>

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useSearchParams } from "react-router-dom";
 import { useMembers } from "@/hooks/api/useMembers";
 import { usePayments } from "@/hooks/api/usePayments";
 import {
@@ -79,8 +78,6 @@ const PLANS = [
 type BillingCycle = "monthly" | "yearly";
 
 const Membership = () => {
-  const [searchParams] = useSearchParams();
-  const requiresActivePlan = searchParams.get('required') === 'active';
   const { user, refreshUser } = useAuth();
   const { useMe, useUpdateMembership } = useMembers();
   const { useVerifyPayment } = usePayments();
@@ -101,38 +98,59 @@ const Membership = () => {
       ? new Date(memberData.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
       : user?.membershipStatus === 'active' ? "Next Billing Cycle" : "N/A";
 
-  const handleUpgrade = (planId: "free" | "basic" | "pro" | "elite") => {
-    if (planId === currentPlan || planId === 'free') return;
-    setProcessing(planId);
+  type PaidPlan = "basic" | "pro" | "elite";
+
+  const startCheckout = (planId: PaidPlan, checkoutType: "subscription" | "upgrade" | "payment-method") => {
+    if (!user?.email) {
+      toast.error("Your account email is not available for checkout.");
+      return;
+    }
     const amount = PLAN_PRICES[planId][billing];
+    setProcessing(checkoutType === "payment-method" ? "payment-method" : planId);
     try {
       initializePaystackPayment({
-      email: user?.email || "",
-      amount,
-      metadata: {
-        plan: planId,
-        billing,
-        userId: user?.id,
-        auth_user_id: user?.authId,
-        type: user?.plan === 'free' ? 'subscription' : 'upgrade'
-      },
-      onSuccess: async (ref) => {
-        try {
-          await verifyPayment.mutateAsync({ reference: ref, plan: planId, billing, amount });
-          await refreshUser();
-        } finally {
+        email: user.email,
+        amount,
+        metadata: {
+          plan: planId,
+          billing,
+          userId: user.id,
+          auth_user_id: user.authId,
+          type: checkoutType,
+        },
+        onSuccess: async (ref) => {
+          try {
+            await verifyPayment.mutateAsync({ reference: ref, plan: planId, billing, amount });
+            await refreshUser();
+            toast.success("Payment completed and membership updated.");
+          } catch {
+            // The payment hook reports the provider or API error.
+          } finally {
+            setProcessing(null);
+          }
+        },
+        onClose: () => {
           setProcessing(null);
-        }
-      },
-      onClose: () => {
-        setProcessing(null);
-        toast.info("Payment cancelled.");
-      },
+          toast.info("Payment cancelled.");
+        },
       });
     } catch (error) {
       setProcessing(null);
-      toast.error(error instanceof Error ? error.message : 'Unable to open Paystack checkout');
+      toast.error(error instanceof Error ? error.message : "Unable to open Paystack checkout");
     }
+  };
+
+  const handleUpgrade = (planId: "free" | PaidPlan) => {
+    if (planId === currentPlan || planId === "free") return;
+    startCheckout(planId, user?.plan === "free" ? "subscription" : "upgrade");
+  };
+
+  const handlePaymentMethod = () => {
+    if (currentPlan === "free" || !["basic", "pro", "elite"].includes(currentPlan)) {
+      toast.info("Choose a paid plan first to open secure payment checkout.");
+      return;
+    }
+    startCheckout(currentPlan as PaidPlan, "payment-method");
   };
   const joinDate = user?.memberSince
     ? new Date(user.memberSince).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
@@ -140,12 +158,6 @@ const Membership = () => {
 
   return (
     <DashboardLayout title="My Membership" subtitle="Manage your plan, billing, and subscription settings">
-      {requiresActivePlan && (
-        <div className="mb-6 rounded-xl border border-primary/30 bg-primary/10 p-4">
-          <p className="text-sm font-semibold text-foreground">An active paid plan is required for dashboard training content.</p>
-          <p className="mt-1 text-xs text-muted-foreground">Choose a plan below to unlock your dashboard, class booking, workouts, and progress tracking.</p>
-        </div>
-      )}
 
       {/* Current Status */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -275,7 +287,7 @@ const Membership = () => {
         <h3 className="text-base font-semibold text-foreground mb-4">Subscription Management</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { icon: CreditCard, title: "Update Payment Method", desc: "Contact support to update billing details", action: () => { window.location.href = `mailto:${import.meta.env.VITE_SUPPORT_EMAIL || 'support@optizgym.com'}?subject=Update%20payment%20method`; }, variant: "default" },
+            { icon: CreditCard, title: "Update Payment Method", desc: "Open secure checkout for your current plan", action: handlePaymentMethod, variant: "default" },
             { icon: RefreshCw, title: "Freeze Membership", desc: "Pause for up to 3 months", action: () => setShowFreezeModal(true), variant: "default" },
             { icon: X, title: "Cancel Membership", desc: "Access continues until period ends", action: () => setShowCancelModal(true), variant: "danger" },
           ].map(({ icon: Icon, title, desc, action, variant }) => (

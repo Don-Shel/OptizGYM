@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export const usePayments = () => {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
   const queryClient = useQueryClient();
 
   const invalidatePayments = () => {
@@ -40,7 +40,14 @@ export const usePayments = () => {
 
   const useAdminPayments = () => useQuery({
     queryKey: ['payments', 'admin'],
-    queryFn: async () => api.payments.getAdmin(await getToken()),
+    queryFn: async () => {
+      const token = await getToken();
+      if (!token) throw new Error('Your admin session is not ready. Please sign in again.');
+      return api.payments.getAdmin(token);
+    },
+    enabled: isSignedIn,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
   });
 
   const useRetryPayment = () => useMutation({
