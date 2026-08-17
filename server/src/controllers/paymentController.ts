@@ -6,7 +6,7 @@ import { eq, desc, and, isNull } from 'drizzle-orm';
 import { logActivity } from '../utils/activity';
 import { PaymentError } from '../utils/errors';
 import { createNotification } from './notificationController';
-import { broadcastToMember } from '../utils/socket';
+import { broadcastResourceChange, broadcastToMember } from '../utils/socket';
 import logger from '../utils/logger';
 
 const PAYSTACK_API = 'https://api.paystack.co';
@@ -248,6 +248,8 @@ export const verifyPayment = async (req: any, res: Response, next: NextFunction)
       req,
     });
     broadcastToMember(req.member.id, 'payment-success', { plan, status: 'paid' });
+    broadcastResourceChange('payments', 'created', payment.id);
+    broadcastResourceChange('members', 'activated', req.member.id);
 
     return successResponse(res, { payment, member });
   } catch (error) {

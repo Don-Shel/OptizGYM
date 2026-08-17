@@ -8,6 +8,31 @@ import { getAllowedFrontendOrigins } from '../config/cors';
 
 let io: Server;
 
+export type RealtimeResource = 'members' | 'classes' | 'trainers' | 'bookings' | 'payments' | 'notifications' | 'stats';
+export type RealtimeAction = 'created' | 'updated' | 'deleted' | 'activated' | 'suspended' | 'cancelled';
+
+export interface RealtimeChangeEvent {
+  resource: RealtimeResource;
+  action: RealtimeAction;
+  id?: string;
+  timestamp: string;
+}
+
+export const broadcastResourceChange = (
+  resource: RealtimeResource,
+  action: RealtimeAction,
+  id?: string,
+) => {
+  const event: RealtimeChangeEvent = {
+    resource,
+    action,
+    ...(id ? { id } : {}),
+    timestamp: new Date().toISOString(),
+  };
+  broadcastToAll('resource-changed', event);
+  return event;
+};
+
 export const initSocket = (server: HttpServer) => {
   io = new Server(server, {
     cors: {

@@ -3,7 +3,7 @@ import { db } from '../utils/db';
 import { members, notifications } from '../db/schema';
 import { successResponse, errorResponse } from '../utils/responses';
 import { eq, desc, and, isNull } from 'drizzle-orm';
-import { broadcastToMember } from '../utils/socket';
+import { broadcastResourceChange, broadcastToMember } from '../utils/socket';
 
 export const getMyNotifications = async (req: any, res: Response) => {
   const memberId = req.member?.id;
@@ -29,7 +29,7 @@ export const markAsRead = async (req: any, res: Response) => {
     await db.update(notifications)
       .set({ isRead: 1 })
       .where(and(eq(notifications.id, id), eq(notifications.memberId, memberId!)));
-
+    broadcastResourceChange('notifications', 'updated', id);
     return successResponse(res, { success: true });
   } catch (error) {
     return errorResponse(res, 'Failed to update notification', 500, error);
@@ -47,6 +47,7 @@ export const createNotification = async (memberId: string, title: string, messag
     }).returning();
 
     broadcastToMember(memberId, 'new-notification', newNotification);
+    broadcastResourceChange('notifications', 'created', newNotification.id);
     return newNotification;
   } catch (error) {
     console.error('[NOTIFICATION] ✗ Failed to create notification:', error);

@@ -5,7 +5,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { logActivity } from '../utils/activity';
-import { broadcastToMember } from '../utils/socket';
+import { broadcastResourceChange, broadcastToAll, broadcastToMember } from '../utils/socket';
 import { createNotification } from './notificationController';
 import { calculateExpiryDate, getBaseDateForMembership } from '../services/membershipService';
 import logger from '../utils/logger';
@@ -117,6 +117,9 @@ export const handlePaystackWebhook = async (req: Request, res: Response) => {
           status: 'active',
           expiresAt: expiresAt.toISOString(),
         });
+        broadcastResourceChange('payments', 'created');
+        broadcastResourceChange('members', 'activated', member.id);
+        broadcastToAll('membership-updated', { memberId: member.id, plan, status: 'active' });
       });
     } catch (error) {
       logger.error(`[PAYSTACK-WEBHOOK][${correlationId}] Transaction failed`, error);
@@ -194,6 +197,8 @@ export const handleNeonAuthWebhook = async (req: Request, res: Response) => {
     const email = user?.email;
     const name = user?.name;
     const isEmailVerified = user?.email_verified === true ? 1 : 0;
+    let realtimeMemberId: string | undefined;
+    let realtimeAction: 'created' | 'updated' = 'updated';
 
     if (!authUserId || !email) {
       logger.warn(`[NEON-WEBHOOK][${correlationId}] Missing required user fields`);
@@ -208,6 +213,7 @@ export const handleNeonAuthWebhook = async (req: Request, res: Response) => {
         .limit(1);
 
       if (existing) {
+        realtimeMemberId = existing.id;
         await tx
           .update(members)
           .set({
@@ -228,6 +234,7 @@ export const handleNeonAuthWebhook = async (req: Request, res: Response) => {
           req,
         });
       } else {
+        realtimeAction = 'created';
         const [newMember] = await tx
           .insert(members)
           .values({
@@ -252,6 +259,7 @@ export const handleNeonAuthWebhook = async (req: Request, res: Response) => {
       }
     });
 
+    if (realtimeMemberId) broadcastResourceChange('members', realtimeAction, realtimeMemberId);
     return res.status(200).json({ received: true });
   } catch (error) {
     logger.error(`[NEON-WEBHOOK][${correlationId}] Error processing webhook`, error);

@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { db } from '../utils/db';
 import { members } from '../db/schema';
-import { successResponse, errorResponse } from '../utils/responses';
+import { errorResponse, successResponse } from '../utils/responses';
+import { broadcastResourceChange, broadcastToMember } from '../utils/socket';
 import { eq, and, isNull } from 'drizzle-orm';
 
 export const syncMember = async (req: any, res: Response) => {
@@ -70,6 +71,7 @@ export const syncMember = async (req: any, res: Response) => {
       }
 
       const isNew = !existingMember;
+      broadcastResourceChange('members', isNew ? 'created' : 'updated', member.id);
       return successResponse(res, member, isNew ? 201 : 200);
     } catch (error) {
       console.error(`[SYNC] ✗ Sync attempt ${attempt} failed:`, error);
@@ -121,6 +123,8 @@ export const getMe = async (req: any, res: Response) => {
         })
         .where(eq(members.id, member.id))
         .returning();
+      broadcastResourceChange('members', 'updated', updated.id);
+      broadcastToMember(updated.id, 'member-profile-updated', { id: updated.id });
       return successResponse(res, updated);
     }
 
@@ -143,6 +147,8 @@ export const updateMyProfile = async (req: any, res: Response) => {
       .returning();
 
     if (!updated) return errorResponse(res, 'Member profile not found', 404);
+    broadcastResourceChange('members', 'updated', updated.id);
+    broadcastToMember(updated.id, 'member-profile-updated', { id: updated.id });
     return successResponse(res, updated);
   } catch (error) {
     return errorResponse(res, 'Failed to update profile', 500, error);
@@ -175,6 +181,7 @@ export const createMember = async (req: any, res: Response) => {
       membershipStatus: 'pending'
     }).returning();
 
+    broadcastResourceChange('members', 'created', newMember.id);
     return successResponse(res, newMember, 201);
   } catch (error) {
     return errorResponse(res, 'Failed to create member', 500, error);
@@ -206,6 +213,7 @@ export const createMemberAdmin = async (req: any, res: Response) => {
       isEmailVerified: req.body.isEmailVerified ? 1 : 0,
       role: 'member',
     }).returning();
+    broadcastResourceChange('members', 'created', created.id);
     return successResponse(res, created, 201);
   } catch (error) {
     if (isDuplicateMemberError(error)) return errorResponse(res, 'A member with this Auth ID or email already exists', 409);
@@ -236,6 +244,7 @@ export const updateMemberAdmin = async (req: any, res: Response) => {
     }).where(and(eq(members.id, req.params.id), isNull(members.deletedAt))).returning();
 
     if (!updated) return errorResponse(res, 'Member not found', 404);
+    broadcastResourceChange('members', 'updated', updated.id);
     return successResponse(res, updated);
   } catch (error) {
     return errorResponse(res, 'Failed to update member', 500, error);
@@ -250,6 +259,7 @@ export const suspendMember = async (req: any, res: Response) => {
       updatedAt: new Date(),
     }).where(and(eq(members.id, req.params.id), isNull(members.deletedAt))).returning();
     if (!updated) return errorResponse(res, 'Member not found', 404);
+    broadcastResourceChange('members', 'suspended', updated.id);
     return successResponse(res, updated);
   } catch (error) {
     return errorResponse(res, 'Failed to suspend member', 500, error);
@@ -265,6 +275,7 @@ export const activateMember = async (req: any, res: Response) => {
       updatedAt: new Date(),
     }).where(and(eq(members.id, req.params.id), isNull(members.deletedAt))).returning();
     if (!updated) return errorResponse(res, 'Member not found', 404);
+    broadcastResourceChange('members', 'activated', updated.id);
     return successResponse(res, updated);
   } catch (error) {
     return errorResponse(res, 'Failed to activate member profile', 500, error);
@@ -279,6 +290,7 @@ export const removeMember = async (req: any, res: Response) => {
       updatedAt: new Date(),
     }).where(and(eq(members.id, req.params.id), isNull(members.deletedAt))).returning();
     if (!updated) return errorResponse(res, 'Member not found', 404);
+    broadcastResourceChange('members', 'deleted', updated.id);
     return successResponse(res, { id: updated.id, removed: true });
   } catch (error) {
     return errorResponse(res, 'Failed to remove member', 500, error);

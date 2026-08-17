@@ -4,6 +4,7 @@ import { instructors } from '../db/schema';
 import { db } from '../utils/db';
 import { errorResponse, successResponse } from '../utils/responses';
 import { removeFromCache } from '../utils/cache';
+import { broadcastResourceChange, broadcastToAll } from '../utils/socket';
 
 const TRAINER_CACHE_KEY = 'all_instructors';
 const CLASS_CACHE_KEY = 'all_classes';
@@ -49,6 +50,8 @@ export const createTrainer = async (req: Request, res: Response) => {
       .returning();
     removeFromCache(TRAINER_CACHE_KEY);
     removeFromCache(CLASS_CACHE_KEY);
+    broadcastResourceChange('trainers', 'created', trainer.id);
+    broadcastToAll('trainer-created', { id: trainer.id });
     return successResponse(res, trainer, 201);
   } catch (error) {
     if (isDuplicateEmailError(error)) return errorResponse(res, 'A trainer with this email already exists', 409);
@@ -65,6 +68,8 @@ export const updateTrainer = async (req: Request, res: Response) => {
     if (!trainer) return errorResponse(res, 'Trainer not found', 404);
     removeFromCache(TRAINER_CACHE_KEY);
     removeFromCache(CLASS_CACHE_KEY);
+    broadcastResourceChange('trainers', 'updated', trainer.id);
+    broadcastToAll('trainer-updated', { id: trainer.id });
     return successResponse(res, trainer);
   } catch (error) {
     if (isDuplicateEmailError(error)) return errorResponse(res, 'A trainer with this email already exists', 409);
@@ -81,6 +86,8 @@ export const deleteTrainer = async (req: Request, res: Response) => {
     if (!trainer) return errorResponse(res, 'Trainer not found', 404);
     removeFromCache(TRAINER_CACHE_KEY);
     removeFromCache(CLASS_CACHE_KEY);
+    broadcastResourceChange('trainers', 'deleted', trainer.id);
+    broadcastToAll('trainer-deleted', { id: trainer.id });
     return successResponse(res, { id: trainer.id, removed: true });
   } catch (error) {
     return errorResponse(res, 'Failed to delete trainer', 500, error);

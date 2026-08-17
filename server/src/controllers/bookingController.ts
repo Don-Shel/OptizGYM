@@ -4,7 +4,7 @@ import { bookings, classes, members } from '../db/schema';
 import { successResponse, errorResponse } from '../utils/responses';
 import { eq, and, sql } from 'drizzle-orm';
 import { logActivity } from '../utils/activity';
-import { broadcastToAll, broadcastToMember } from '../utils/socket';
+import { broadcastResourceChange, broadcastToAll, broadcastToMember } from '../utils/socket';
 import { createNotification } from './notificationController';
 import { BookingError } from '../utils/errors';
 import logger from '../utils/logger';
@@ -127,6 +127,7 @@ export const createBooking = async (req: any, res: Response, next: NextFunction)
 
     // Real-time updates
     broadcastToAll('class-updated', { classId, enrolled: (gymClass.enrolled || 0) + 1 });
+    broadcastResourceChange('bookings', 'created', booking.id);
     broadcastToMember(memberId, 'booking-confirmed', { booking, className: gymClass.name });
 
     return successResponse(res, {
@@ -197,6 +198,7 @@ export const cancelBooking = async (req: any, res: Response, next: NextFunction)
     });
 
     broadcastToAll('class-updated', { classId: result.classId, enrolled: result.enrolled });
+    broadcastResourceChange('bookings', 'cancelled', result.booking.id);
     if (result.booking.memberId) {
       broadcastToMember(result.booking.memberId, 'booking-cancelled', {
         bookingId: result.booking.id,

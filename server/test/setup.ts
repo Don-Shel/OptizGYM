@@ -10,6 +10,7 @@ vi.mock('../src/utils/socket', () => ({
   getIO: vi.fn(),
   broadcastToMember: vi.fn(),
   broadcastToAll: vi.fn(),
+  broadcastResourceChange: vi.fn(),
 }));
 
 // Mock Neon Auth utility

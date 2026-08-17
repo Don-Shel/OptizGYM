@@ -4,7 +4,7 @@ import { classes, instructors } from '../db/schema';
 import { successResponse, errorResponse } from '../utils/responses';
 import { and, eq, isNull } from 'drizzle-orm';
 import { getFromCache, setToCache, removeFromCache } from '../utils/cache';
-import { broadcastToAll } from '../utils/socket';
+import { broadcastResourceChange, broadcastToAll } from '../utils/socket';
 import { notifyAllActiveMembers } from './notificationController';
 
 const CACHE_KEYS = {
@@ -69,6 +69,7 @@ export const createClass = async (req: Request, res: Response) => {
     const publicClass = await getPublicClass(newClass.id);
     if (publicClass) {
       broadcastToAll('class-created', publicClass);
+      broadcastResourceChange('classes', 'created', newClass.id);
       await notifyAllActiveMembers(
         'New class just dropped',
         `${publicClass.name} with ${publicClass.instructor} is now available to book.`,
@@ -92,6 +93,7 @@ export const updateClass = async (req: Request, res: Response) => {
     const publicClass = await getPublicClass(updatedClass.id);
     if (publicClass) {
       broadcastToAll('class-updated', publicClass);
+      broadcastResourceChange('classes', 'updated', updatedClass.id);
       await notifyAllActiveMembers(
         'Class schedule updated',
         `${publicClass.name} has new details. Check the schedule before booking.`,
@@ -114,6 +116,7 @@ export const deleteClass = async (req: Request, res: Response) => {
     if (!deletedClass) return errorResponse(res, 'Class not found', 404);
     removeFromCache(CACHE_KEYS.ALL_CLASSES);
     broadcastToAll('class-deleted', { id: deletedClass.id });
+    broadcastResourceChange('classes', 'deleted', deletedClass.id);
     if (existingClass) {
       await notifyAllActiveMembers('Class removed from schedule', `${existingClass.name} is no longer available to book.`, 'warning');
     }
