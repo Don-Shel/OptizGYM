@@ -9,6 +9,7 @@ import { SocketProvider } from "@/contexts/SocketContext";
 import { NeonAuthUIProvider } from "@neondatabase/auth-ui";
 import { authClient } from "@/lib/neon";
 import "@neondatabase/auth-ui/css";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Lazy-loaded pages
 const Index = lazy(() => import("./pages/Index"));
@@ -16,6 +17,8 @@ const Classes = lazy(() => import("./pages/Classes"));
 const Trainers = lazy(() => import("./pages/Trainers"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Forbidden = lazy(() => import("./pages/Forbidden"));
+const ServerError = lazy(() => import("./pages/ServerError"));
 
 // Auth pages
 const SignIn = lazy(() => import("./pages/auth/SignIn"));
@@ -140,6 +143,10 @@ const AppRoutes = () => (
       <Route path="/admin/payments" element={<ProtectedRoute adminOnly><AdminPayments /></ProtectedRoute>} />
       <Route path="/admin/analytics" element={<ProtectedRoute adminOnly><AdminAnalytics /></ProtectedRoute>} />
 
+      {/* ── Controlled error pages ── */}
+      <Route path="/forbidden" element={<Forbidden />} />
+      <Route path="/server-error" element={<ServerError />} />
+
       {/* ── Fallback ── */}
       <Route path="*" element={<NotFound />} />
     </Routes>
@@ -179,7 +186,9 @@ const App = () => (
           <SocketProvider>
             <TooltipProvider>
               <div className="min-h-screen bg-background text-foreground font-sans antialiased">
-                <AppRoutes />
+                <ErrorBoundary>
+                  <AppRoutes />
+                </ErrorBoundary>
                 <Toaster />
                 <Sonner position="top-right" closeButton richColors />
               </div>

@@ -45,7 +45,7 @@ describe('Member API Integration', () => {
 
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toBe('Member not found');
+      expect(response.body.error.code).toBe('NOT_FOUND');
     });
 
     it('returns 401 if not authenticated', async () => {

@@ -10,7 +10,8 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 type Origin = string;
 
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
 import cors from 'cors';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
@@ -18,6 +19,7 @@ import { createServer } from 'http';
 import { initSocket } from './src/utils/socket';
 import { errorHandler } from './src/middleware/errorHandler';
 import { getAllowedFrontendOrigins } from './src/config/cors';
+import { failResponse } from './src/utils/responses';
 
 import authRoutes from './src/routes/authRoutes';
 import memberRoutes from './src/routes/memberRoutes';
@@ -33,6 +35,13 @@ import trainerRoutes from './src/routes/trainerRoutes';
 
 const app = express();
 const httpServer = createServer(app);
+
+app.use((req, res, next) => {
+  const requestId = randomUUID();
+  (req as any).id = requestId;
+  res.setHeader('x-request-id', requestId);
+  next();
+});
 const port = Number(process.env.PORT || 3001);
 const frontendOrigins: Origin[] = getAllowedFrontendOrigins();
 const apiPublicUrl = process.env.API_PUBLIC_URL || `http://localhost:${port}`;
@@ -101,7 +110,15 @@ app.use((req, res, next) => {
 // Webhook routes must run before express.json so their raw request bodies remain available.
 app.use('/api/webhooks', authLimiter, webhookRoutes);
 
-app.use(express.json());
+app.use(express.json({ limit: '256kb' }));
+
+// Body-parser errors must not expose parser messages or request internals.
+app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  if (err?.type === 'entity.parse.failed' || (err instanceof SyntaxError && err.status === 400)) {
+    return failResponse(res, 400, 'INVALID_JSON', 'Request body is not valid JSON.');
+  }
+  return next(err);
+});
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/members', memberRoutes);
@@ -115,6 +132,10 @@ app.use('/api/trainers', trainerRoutes);
 app.use('/api', systemRoutes);
 
 // The frontend is deployed separately in the split topology; this process is API-only.
+// Express does not treat an unmatched route as an error, so handle API 404s explicitly.
+app.use('/api', (_req, res) => {
+  return failResponse(res, 404, 'NOT_FOUND', 'The requested API resource was not found.');
+});
 app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {

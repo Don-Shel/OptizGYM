@@ -5,7 +5,9 @@ import { eq, and, isNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { logActivity } from '../utils/activity';
-import { broadcastResourceChange, broadcastToAll, broadcastToMember } from '../utils/socket';
+import { errorResponse, successResponse } from '../utils/responses';
+import { broadcastResourceChange, broadcastToMember } from '../utils/socket';
+import { PLAN_PRICES } from './paymentController';
 import { createNotification } from './notificationController';
 import { calculateExpiryDate, getBaseDateForMembership } from '../services/membershipService';
 import logger from '../utils/logger';
@@ -16,118 +18,128 @@ dotenv.config();
 // ── Paystack ──────────────────────────────────────────────────────────────────
 
 export const handlePaystackWebhook = async (req: Request, res: Response) => {
+  const correlationId = crypto.randomUUID().slice(0, 8);
   const secret = process.env.PAYSTACK_SECRET_KEY;
-  const signature = req.headers['x-paystack-signature'];
+  const signatureHeader = req.headers['x-paystack-signature'];
+  const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader;
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body ?? '');
 
-  if (!signature) {
-    logger.warn('[PAYSTACK-WEBHOOK] Missing signature');
-    return res.status(400).send('Missing signature');
+  if (!secret) {
+    logger.error('[PAYSTACK-WEBHOOK] Secret is not configured', { correlationId });
+    return errorResponse(res, 'Webhook service unavailable', 503);
+  }
+  if (typeof signature !== 'string' || !signature) {
+    logger.warn('[PAYSTACK-WEBHOOK] Missing signature', { correlationId });
+    return errorResponse(res, 'Webhook request rejected', 400);
   }
 
-  const hash = crypto.createHmac('sha512', secret!).update(req.body).digest('hex');
-  if (hash !== signature) {
-    logger.error('[PAYSTACK-WEBHOOK] Invalid signature');
-    return res.status(400).send('Invalid signature');
+  const expectedSignature = crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
+  const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+  const receivedBuffer = Buffer.from(signature, 'hex');
+  if (expectedBuffer.length !== receivedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
+    logger.warn('[PAYSTACK-WEBHOOK] Invalid signature', { correlationId });
+    return errorResponse(res, 'Webhook request rejected', 400);
   }
 
-  const event = JSON.parse(req.body.toString());
-  const correlationId = Math.random().toString(36).substring(7);
-  logger.info(`[PAYSTACK-WEBHOOK][${correlationId}] Received event: ${event.event}`);
+  let event: any;
+  try {
+    event = JSON.parse(rawBody.toString('utf8'));
+  } catch (error) {
+    logger.warn('[PAYSTACK-WEBHOOK] Invalid JSON payload', { correlationId, error });
+    return errorResponse(res, 'Webhook request rejected', 400);
+  }
 
-  if (event.event === 'charge.success') {
-    const { reference, amount, currency, metadata, status: paymentStatus } = event.data;
-    const { auth_user_id, plan, billing, type } = metadata || {};
+  if (event?.event !== 'charge.success') {
+    return successResponse(res, { received: true });
+  }
 
-    if (!auth_user_id) {
-      logger.error(`[PAYSTACK-WEBHOOK][${correlationId}] Missing auth_user_id in metadata`);
-      return res.status(400).send('Missing auth_user_id');
-    }
+  const providerData = event.data;
+  const reference = typeof providerData?.reference === 'string' ? providerData.reference.trim() : '';
+  const amountInMinorUnits = Number(providerData?.amount);
+  const currency = providerData?.currency;
+  const providerStatus = providerData?.status;
+  if (!reference || !Number.isSafeInteger(amountInMinorUnits) || amountInMinorUnits <= 0 || providerStatus !== 'success' || currency !== 'KES') {
+    logger.warn('[PAYSTACK-WEBHOOK] Invalid successful-charge payload', { correlationId, reference, currency, providerStatus });
+    return errorResponse(res, 'Webhook request rejected', 400);
+  }
 
-    try {
-      await db.transaction(async (tx) => {
-        // 1. Fetch member with lock for update (and ensure not deleted)
-        const [member] = await tx
-          .select()
-          .from(members)
-          .where(and(eq(members.authUserId, auth_user_id), isNull(members.deletedAt)))
-          .for('update');
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [pending] = await tx.select().from(payments)
+        .where(eq(payments.paystackReference, reference))
+        .for('update')
+        .limit(1);
 
-        if (!member) {
-          logger.error(`[PAYSTACK-WEBHOOK][${correlationId}] Member not found for authUserId: ${auth_user_id}`);
-          throw new Error('Member not found');
-        }
+      if (!pending) throw new Error('Payment reference is not associated with a pending payment');
+      if (pending.status === 'paid') return { alreadyProcessed: true as const };
+      if (pending.status !== 'pending' || !pending.memberId) throw new Error('Payment is not eligible for settlement');
 
-        // 2. Calculate new expiry
-        const baseDate = getBaseDateForMembership(member.expiresAt, type, member.membershipStatus || 'pending');
-        const expiresAt = calculateExpiryDate(baseDate, billing || 'monthly');
+      const billing = pending.billing === 'yearly' ? 'yearly' : 'monthly';
+      const expectedAmount = PLAN_PRICES[pending.plan]?.[billing];
+      if (!expectedAmount || amountInMinorUnits !== Math.round(expectedAmount * 100)) {
+        throw new Error('Provider amount does not match the server-side plan');
+      }
 
-        // 3. Update member status & privileges (Membership management)
-        await tx.update(members)
-          .set({
-            plan: plan || 'basic',
-            planBilling: billing || 'monthly',
-            membershipStatus: 'active',
-            expiresAt: expiresAt,
-            updatedAt: new Date()
-          })
-          .where(eq(members.id, member.id));
+      const [member] = await tx.select().from(members)
+        .where(and(eq(members.id, pending.memberId), isNull(members.deletedAt)))
+        .for('update')
+        .limit(1);
+      if (!member) throw new Error('Member profile is unavailable');
 
-        // 4. Record payment with audit log (PCI compliance: unique IDs, timestamps)
-        await tx.insert(payments)
-          .values({
-            memberId: member.id,
-            amount: (amount / 100).toString(),
-            currency: currency || 'USD',
-            plan: plan || 'basic',
-            paystackReference: reference,
-            status: 'paid',
-            paidAt: new Date(),
-            createdAt: new Date()
-          })
-          .onConflictDoUpdate({
-            target: payments.paystackReference,
-            set: {
-              status: 'paid',
-              paidAt: new Date(),
-              amount: (amount / 100).toString()
-            }
-          });
+      const paidAt = providerData.paid_at ? new Date(providerData.paid_at) : new Date();
+      const baseDate = getBaseDateForMembership(member.expiresAt, 'subscription', member.membershipStatus || 'pending');
+      const expiresAt = calculateExpiryDate(baseDate, billing);
+      const [payment] = await tx.update(payments)
+        .set({ status: 'paid', paidAt, amount: expectedAmount.toFixed(2), currency: 'KES' })
+        .where(and(eq(payments.id, pending.id), eq(payments.status, 'pending')))
+        .returning();
+      if (!payment) throw new Error('Payment has already been processed');
 
-        logger.info(`[PAYSTACK-WEBHOOK][${correlationId}] Membership upgraded for member ${member.id}`, { plan, expiresAt });
+      const [updatedMember] = await tx.update(members)
+        .set({
+          plan: pending.plan as 'basic' | 'pro' | 'elite',
+          planBilling: billing,
+          membershipStatus: 'active',
+          expiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(members.id, member.id))
+        .returning();
+      if (!updatedMember) throw new Error('Member profile is unavailable');
 
-        // Background tasks (outside transaction for performance)
-        Promise.all([
-          createNotification(
-            member.id,
-            'Payment Successful',
-            `Your payment for the ${plan} plan has been processed. Your membership is now active.`,
-            'success'
-          ),
-          logActivity({
-            authUserId: auth_user_id,
-            action: 'membership_upgraded',
-            metadata: { plan, amount: amount / 100, reference, correlationId },
-            req,
-          })
-        ]).catch(err => logger.error(`[PAYSTACK-WEBHOOK][${correlationId}] Background task error`, err));
+      return { alreadyProcessed: false as const, payment, member: updatedMember, expiresAt, billing };
+    });
 
-        // Real-time notification for instant visual confirmation
-        broadcastToMember(member.id, 'payment-success', {
-          plan,
-          status: 'active',
-          expiresAt: expiresAt.toISOString(),
-        });
-        broadcastResourceChange('payments', 'created');
-        broadcastResourceChange('members', 'activated', member.id);
-        broadcastToAll('membership-updated', { memberId: member.id, plan, status: 'active' });
+    if (!result.alreadyProcessed) {
+      await Promise.all([
+        createNotification(
+          result.member.id,
+          'Payment Successful',
+          `Your payment for the ${result.payment.plan} plan has been processed. Your membership is now active.`,
+          'success',
+        ),
+        logActivity({
+          authUserId: result.member.authUserId,
+          action: 'membership_upgraded',
+          metadata: { plan: result.payment.plan, amount: Number(result.payment.amount), reference, correlationId },
+          req,
+        }),
+      ]).catch((error) => logger.error('[PAYSTACK-WEBHOOK] Background task failed', { correlationId, error }));
+
+      broadcastToMember(result.member.id, 'payment-success', {
+        plan: result.payment.plan,
+        status: 'active',
+        expiresAt: result.expiresAt.toISOString(),
       });
-    } catch (error) {
-      logger.error(`[PAYSTACK-WEBHOOK][${correlationId}] Transaction failed`, error);
-      return res.status(500).send('Webhook Processing Error');
+      broadcastResourceChange('payments', 'updated', result.payment.id);
+      broadcastResourceChange('members', 'activated', result.member.id);
     }
-  }
 
-  return res.send('Webhook processed');
+    return successResponse(res, { received: true });
+  } catch (error) {
+    logger.error('[PAYSTACK-WEBHOOK] Transaction failed', { correlationId, error });
+    return errorResponse(res, 'Webhook processing failed', 500);
+  }
 };
 
 // ── Neon Auth Webhook ─────────────────────────────────────────────────────────

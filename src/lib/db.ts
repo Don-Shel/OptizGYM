@@ -16,14 +16,40 @@ const getHeaders = (token?: string | null): HeadersInit => ({
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
 
+const PUBLIC_ERROR_MESSAGES: Record<string, string> = {
+  AUTH_REQUIRED: 'Please sign in again.',
+  AUTH_INVALID: 'Your session is no longer valid. Please sign in again.',
+  UNAUTHORIZED: 'Please sign in again.',
+  FORBIDDEN: 'You do not have permission to perform that action.',
+  ADMIN_REQUIRED: 'Administrator access is required for this action.',
+  NOT_FOUND: 'The requested resource was not found.',
+  CONFLICT: 'This request conflicts with the current resource state.',
+  VALIDATION_FAILED: 'Please check the information you entered.',
+  BAD_REQUEST: 'The request could not be processed.',
+  INVALID_JSON: 'The request could not be processed.',
+  RATE_LIMITED: 'Too many requests. Please try again later.',
+  SERVICE_UNAVAILABLE: 'The service is temporarily unavailable. Please try again.',
+  INTERNAL_ERROR: 'Something went wrong. Please try again.',
+};
+
 const unwrap = async (res: Response, fallbackMsg = 'Request failed'): Promise<any> => {
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as Record<string, any>;
-    const detail = Array.isArray(body.details)
-      ? body.details.map((item: any) => item?.path ? `${item.path}: ${item.message}` : item?.message).filter(Boolean).join('; ')
-      : '';
-    const message = body.error ?? body.message ?? fallbackMsg;
-    throw new Error(`${message}${detail ? ` — ${detail}` : ''} (${res.status})`);
+    const error = body.error && typeof body.error === 'object' ? body.error : body;
+    const code = typeof error?.code === 'string' ? error.code : undefined;
+    const statusFallback = res.status >= 500
+      ? 'Something went wrong. Please try again.'
+      : res.status === 401
+        ? 'Please sign in again.'
+        : res.status === 403
+          ? 'You do not have permission to perform that action.'
+          : res.status === 404
+            ? 'The requested resource was not found.'
+            : fallbackMsg;
+    const apiError = new Error((code && PUBLIC_ERROR_MESSAGES[code]) || statusFallback) as Error & { code?: string; status?: number };
+    apiError.code = code;
+    apiError.status = res.status;
+    throw apiError;
   }
   const body = await res.json();
   return body.data !== undefined ? body.data : body;
@@ -167,7 +193,7 @@ export const api = {
       } catch (error) {
         // Keep the reporting page usable during a rolling Render deployment where
         // an older API instance may not yet expose the dedicated endpoint.
-        if (!(error instanceof Error) || !error.message.includes('(404)')) throw error;
+        if (!(error instanceof Error) || (error as Error & { code?: string }).code !== 'NOT_FOUND') throw error;
         const legacyStats = await request('/stats', { headers: getHeaders(token) }, 'Failed to fetch admin stats');
         return {
           legacyFallback: true,

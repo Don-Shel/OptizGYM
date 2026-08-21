@@ -33,11 +33,12 @@ const Pricing = () => {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const { user, isSignedIn, refreshUser } = useAuth();
-  const { useVerifyPayment } = usePayments();
+  const { useCreatePayment, useVerifyPayment } = usePayments();
+  const createPayment = useCreatePayment();
   const verifyPayment = useVerifyPayment();
   const navigate = useNavigate();
 
-  const handleSelectPlan = (plan: typeof plans[0]) => {
+  const handleSelectPlan = async (plan: typeof plans[0]) => {
     if (!isSignedIn) {
       navigate(`/auth/sign-up?plan=${plan.id}&billing=${yearly ? 'yearly' : 'monthly'}`);
       return;
@@ -48,36 +49,48 @@ const Pricing = () => {
       return;
     }
 
+    const paidPlan = plan.id as "basic" | "pro" | "elite";
+    const billing = yearly ? "yearly" : "monthly";
+    const amount = PLAN_PRICES[paidPlan][billing];
+    const nonce = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2, 10);
+    const reference = `optizgym-${Date.now()}-${nonce}`;
     setLoading(plan.id);
-    const amount = yearly ? plan.yearly : plan.monthly;
 
     try {
-      initializePaystackPayment({
-      email: user?.email || "",
-      amount,
-      metadata: {
-        plan: plan.id,
-        billing: yearly ? "yearly" : "monthly",
-        auth_user_id: user?.authId,
-        userId: user?.id
-      },
-      onSuccess: async (ref) => {
-        try {
-          await verifyPayment.mutateAsync({ reference: ref, plan: plan.id, billing: yearly ? 'yearly' : 'monthly', amount });
-          await refreshUser();
-          navigate('/dashboard/membership');
-        } finally {
-          setLoading(null);
-        }
-      },
-      onClose: () => {
-        setLoading(null);
-        toast.info("Payment cancelled.");
-      },
+      await createPayment.mutateAsync({
+        plan: paidPlan,
+        billing,
+        paystack_reference: reference,
       });
-    } catch (error) {
+      initializePaystackPayment({
+        email: user?.email || "",
+        amount,
+        ref: reference,
+        metadata: {
+          plan: paidPlan,
+          billing,
+          auth_user_id: user?.authId,
+          userId: user?.id,
+        },
+        onSuccess: async (ref) => {
+          try {
+            await verifyPayment.mutateAsync({ reference: ref });
+            await refreshUser();
+            navigate('/dashboard/membership');
+          } catch {
+            toast.error("Payment verification failed. Please contact support if you were charged.");
+          } finally {
+            setLoading(null);
+          }
+        },
+        onClose: () => {
+          setLoading(null);
+          toast.info("Payment cancelled.");
+        },
+      });
+    } catch {
       setLoading(null);
-      toast.error(error instanceof Error ? error.message : 'Unable to open Paystack checkout');
+      toast.error("Unable to open payment checkout. Please try again.");
     }
   };
 

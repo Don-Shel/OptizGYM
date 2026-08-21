@@ -69,7 +69,6 @@ const ClassBooking = () => {
         await cancellationMutation.mutateAsync(existingBooking.id);
       } else {
         await bookingMutation.mutateAsync({
-          member_id: user?.id,
           class_id: cls.id,
         });
       }

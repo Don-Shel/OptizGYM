@@ -1,15 +1,22 @@
 import * as jose from 'jose';
 import dotenv from 'dotenv';
+import logger from './logger';
 
 dotenv.config();
 
 export const neonAuthUrl = process.env.NEON_AUTH_URL;
 export const neonJwksUrl = process.env.NEON_JWKS_URL;
+const neonAuthIssuer = process.env.NEON_AUTH_ISSUER;
+const neonAuthAudience = process.env.NEON_AUTH_AUDIENCE;
 
 if (!neonAuthUrl || !neonJwksUrl) {
   throw new Error(
     '[AUTH] NEON_AUTH_URL and NEON_JWKS_URL are required before Neon Auth can be initialized.'
   );
+}
+
+if (process.env.NODE_ENV === 'production' && (!neonAuthIssuer || !neonAuthAudience)) {
+  throw new Error('[AUTH] NEON_AUTH_ISSUER and NEON_AUTH_AUDIENCE are required in production.');
 }
 
 const JWKS = jose.createRemoteJWKSet(new URL(neonJwksUrl));
@@ -19,14 +26,30 @@ if (!Number.isFinite(webhookMaxAgeMs) || webhookMaxAgeMs <= 0) {
   throw new Error('[AUTH] NEON_WEBHOOK_MAX_AGE_MS must be a positive number of milliseconds.');
 }
 
+const MAX_TOKEN_LIFETIME_SECONDS = 24 * 60 * 60;
+const CLOCK_TOLERANCE_SECONDS = 5;
+
 export const verifyNeonToken = async (token: string) => {
   try {
-    const decoded = jose.decodeJwt(token);
-    console.log(`[AUTH] Verifying token. Configured Iss: "${neonAuthUrl}" | Token Iss: "${decoded.iss}"`);
+    const verifyOptions: jose.JWTVerifyOptions = {
+      algorithms: ['EdDSA'],
+      requiredClaims: ['sub', 'iat', 'exp'],
+      clockTolerance: CLOCK_TOLERANCE_SECONDS,
+      ...(neonAuthIssuer ? { issuer: neonAuthIssuer } : {}),
+      ...(neonAuthAudience ? { audience: neonAuthAudience } : {}),
+    };
+    const { payload } = await jose.jwtVerify(token, JWKS, verifyOptions);
+    const now = Math.floor(Date.now() / 1000);
 
-    const { payload } = await jose.jwtVerify(token, JWKS, {
-      clockTolerance: '5s',
-    });
+    if (
+      typeof payload.iat !== 'number' ||
+      typeof payload.exp !== 'number' ||
+      payload.iat > now + CLOCK_TOLERANCE_SECONDS ||
+      payload.exp <= payload.iat ||
+      payload.exp - payload.iat > MAX_TOKEN_LIFETIME_SECONDS
+    ) {
+      throw new Error('JWT lifetime or issue time violates the authentication policy');
+    }
 
     return {
       ...payload,
@@ -36,14 +59,11 @@ export const verifyNeonToken = async (token: string) => {
       name: (payload as any).name ?? (payload as any).displayName ?? '',
     };
   } catch (error) {
-    console.error(
-      '[AUTH] ✗ Token verification failed:',
-      error instanceof jose.errors.JWTClaimValidationFailed ? `Claim validation failed: ${error.claim} ${error.reason}` :
-      error instanceof Error ? error.message : String(error)
-    );
-    if (error instanceof Error && error.stack) {
-      console.error('[AUTH] Error stack:', error.stack);
-    }
+    logger.warn('[AUTH] Token verification failed', {
+      reason: error instanceof jose.errors.JWTClaimValidationFailed
+        ? `${error.claim}:${error.reason}`
+        : error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 };
@@ -58,7 +78,7 @@ export const verifyNeonWebhookSignature = async (
     signature?: string;
     signatureKid?: string;
     timestamp?: string;
-  },
+  }
 ) => {
   const { signature, signatureKid, timestamp } = headers;
 

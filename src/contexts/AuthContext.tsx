@@ -67,14 +67,6 @@ function mapMember(data: any): User {
   };
 }
 
-function extractSessionUser(sessionResponse: any): any {
-  return (
-    sessionResponse?.data?.user ||           // Neon Auth / better-auth convention
-    sessionResponse?.data?.session?.user ||  // fallback
-    null
-  );
-}
-
 // ─── Provider ────────────────────────────────────────────────────────────────
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -113,10 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoaded(false);
 
     try {
-      const sessionResponse = await authClient.getSession();
       const token = await getAuthToken();
-      const sessionUser = extractSessionUser(sessionResponse);
-
       if (requestId !== profileRequestId.current) return;
 
       if (!token) {
@@ -134,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsSyncing(true);
       setSyncError(null);
 
-      console.log('[AUTH] Calling /api/members/me with token:', token.slice(0, 20) + '…');
+      console.debug('[AUTH] Calling /api/members/me');
 
       // 1. Try to load existing DB profile
       const meRes = await fetch(`${API_BASE}/members/me`, {
@@ -160,10 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            email: sessionUser?.email || '',
-            fullName: sessionUser?.name || sessionUser?.displayName || '',
-          }),
+          body: JSON.stringify({}),
         });
 
         if (syncRes.ok) {

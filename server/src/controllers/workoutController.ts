@@ -21,11 +21,11 @@ export const getWorkoutsByMemberId = async (req: Request, res: Response) => {
 };
 
 export const createWorkout = async (req: any, res: Response) => {
-  const { member_id: memberId, date, exercises, duration_minutes: durationMinutes, calories_burned: caloriesBurned, notes } = req.body;
+  const { date, exercises, duration_minutes: durationMinutes, calories_burned: caloriesBurned, notes } = req.body;
+  const memberId = req.member?.id;
 
-  // RBAC: Ensure user is creating workout for themselves
-  if (req.member?.id !== memberId) {
-    return errorResponse(res, 'Forbidden: You can only record workouts for yourself', 403);
+  if (!memberId) {
+    return errorResponse(res, 'Member profile not found', 404);
   }
 
   try {

@@ -28,7 +28,7 @@ describe('API Service Layer', () => {
       json: async () => ({}),
     });
 
-    await expect(api.members.getAll()).rejects.toThrow('Failed to fetch members');
+    await expect(api.members.getAll()).rejects.toThrow('Something went wrong. Please try again.');
   });
 
   it('fetches current member profile', async () => {

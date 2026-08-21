@@ -96,7 +96,6 @@ const Progress = () => {
     if (!newLog.duration || !newLog.calories) { toast.error("Please fill in duration and calories."); return; }
 
     workoutMutation.mutate({
-      member_id: user?.id,
       date: new Date().toISOString().split("T")[0],
       type: newLog.type,
       duration_minutes: parseInt(newLog.duration),

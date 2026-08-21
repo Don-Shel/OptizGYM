@@ -9,11 +9,6 @@ describe('Booking API Integration', () => {
   });
 
   describe('POST /api/bookings', () => {
-    const validBooking = {
-      member_id: '1e5e7836-8c4d-4444-a957-3f9f9b9e9c9d',
-      class_id: '2e5e7836-8c4d-4444-a957-3f9f9b9e9c9d'
-    };
-
     it('successfully creates a booking for an active member', async () => {
       const mockMember = {
         id: '1e5e7836-8c4d-4444-a957-3f9f9b9e9c9d',
@@ -46,7 +41,6 @@ describe('Booking API Integration', () => {
         .post('/api/bookings')
         .set('Authorization', 'Bearer valid-token')
         .send({
-          member_id: mockMember.id,
           class_id: mockClass.id
         });
 
@@ -76,7 +70,7 @@ describe('Booking API Integration', () => {
         });
 
       expect(response.status).toBe(400); // Now 400 with BookingError
-      expect(response.body.error).toContain('Membership upgrade required');
+      expect(response.body.error.code).toBe('ELIGIBILITY_FAILED');
     });
 
     it('returns 400 if class is full', async () => {
@@ -101,12 +95,11 @@ describe('Booking API Integration', () => {
         .post('/api/bookings')
         .set('Authorization', 'Bearer valid-token')
         .send({
-          member_id: mockMember.id,
           class_id: mockClass.id
         });
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Class is full');
+      expect(response.body.error.code).toBe('CLASS_FULL');
     });
 
 

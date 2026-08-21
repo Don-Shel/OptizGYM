@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AnyZodObject, ZodError } from 'zod';
 import { errorResponse } from '../utils/responses';
+import logger from '../utils/logger';
 
 /**
  * Middleware to validate request body using Zod
@@ -13,17 +14,11 @@ export const validate = (schema: AnyZodObject) => {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
-        return errorResponse(
-          res,
-          'Validation failed',
-          400,
-          error.errors.map(err => ({
-            path: err.path.join('.'),
-            message: err.message
-          }))
-        );
+        logger.warn('[VALIDATION] Request rejected', { issues: error.issues });
+        return errorResponse(res, 'The request could not be validated', 400, { reason: 'validation_failed' });
       }
-      return errorResponse(res, 'Internal server error during validation', 500);
+      logger.error('[VALIDATION] Unexpected validation failure', { error });
+      return errorResponse(res, 'Validation service unavailable', 500);
     }
   };
 };

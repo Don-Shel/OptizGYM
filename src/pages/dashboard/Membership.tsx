@@ -80,8 +80,9 @@ type BillingCycle = "monthly" | "yearly";
 const Membership = () => {
   const { user, refreshUser } = useAuth();
   const { useMe, useUpdateMembership } = useMembers();
-  const { useVerifyPayment } = usePayments();
+  const { useCreatePayment, useVerifyPayment } = usePayments();
   const { data: memberData } = useMe();
+  const createPayment = useCreatePayment();
   const verifyPayment = useVerifyPayment();
   const updateMembership = useUpdateMembership();
 
@@ -100,17 +101,20 @@ const Membership = () => {
 
   type PaidPlan = "basic" | "pro" | "elite";
 
-  const startCheckout = (planId: PaidPlan, checkoutType: "subscription" | "upgrade" | "payment-method") => {
+  const startCheckout = async (planId: PaidPlan, checkoutType: "subscription" | "upgrade" | "payment-method") => {
     if (!user?.email) {
       toast.error("Your account email is not available for checkout.");
       return;
     }
     const amount = PLAN_PRICES[planId][billing];
+    const ref = `optizgym-${Date.now()}-${crypto.randomUUID?.() || Math.random().toString(36).slice(2, 10)}`;
     setProcessing(checkoutType === "payment-method" ? "payment-method" : planId);
     try {
+      await createPayment.mutateAsync({ plan: planId, billing, paystack_reference: ref });
       initializePaystackPayment({
         email: user.email,
         amount,
+        ref,
         metadata: {
           plan: planId,
           billing,
@@ -120,7 +124,7 @@ const Membership = () => {
         },
         onSuccess: async (ref) => {
           try {
-            await verifyPayment.mutateAsync({ reference: ref, plan: planId, billing, amount });
+            await verifyPayment.mutateAsync({ reference: ref });
             await refreshUser();
             toast.success("Payment completed and membership updated.");
           } catch {
@@ -142,7 +146,7 @@ const Membership = () => {
 
   const handleUpgrade = (planId: "free" | PaidPlan) => {
     if (planId === currentPlan || planId === "free") return;
-    startCheckout(planId, user?.plan === "free" ? "subscription" : "upgrade");
+    void startCheckout(planId, user?.plan === "free" ? "subscription" : "upgrade");
   };
 
   const handlePaymentMethod = () => {
@@ -150,7 +154,7 @@ const Membership = () => {
       toast.info("Choose a paid plan first to open secure payment checkout.");
       return;
     }
-    startCheckout(currentPlan as PaidPlan, "payment-method");
+    void startCheckout(currentPlan as PaidPlan, "payment-method");
   };
   const joinDate = user?.memberSince
     ? new Date(user.memberSince).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })

@@ -107,6 +107,7 @@ export const payments = pgTable('payments', {
   amount: numeric('amount', { precision: 10, scale: 2 }).notNull(),
   currency: text('currency').default('USD'),
   plan: text('plan').notNull(),
+  billing: text('billing').default('monthly').notNull(),
   paystackReference: text('paystack_reference').unique(),
   status: text('status').default('pending'),
   paidAt: timestamp('paid_at'),

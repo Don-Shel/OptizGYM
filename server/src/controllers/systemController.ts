@@ -2,23 +2,14 @@ import { Request, Response } from 'express';
 import { sql, db } from '../utils/db';
 import { successResponse, errorResponse } from '../utils/responses';
 import logger from '../utils/logger';
-import os from 'os';
 
-export const healthCheck = async (req: Request, res: Response) => {
+export const healthCheck = async (_req: Request, res: Response) => {
   try {
-    const start = Date.now();
     await sql`SELECT 1`;
-    const latency = Date.now() - start;
-
-    return successResponse(res, {
-      status: 'ok',
-      database: 'connected',
-      latency: `${latency}ms`,
-      timestamp: new Date().toISOString()
-    });
+    return res.status(200).json({ status: 'ok' });
   } catch (error) {
-    logger.error('[HEALTH] ✗ Database connection failed:', error);
-    return errorResponse(res, 'Database connection failed', 500, error);
+    logger.error('[HEALTH] Database readiness check failed', error);
+    return res.status(503).json({ status: 'unavailable' });
   }
 };
 
@@ -162,23 +153,13 @@ export const seedDb = async (req: Request, res: Response) => {
   }
 };
 
-export const getHealth = async (req: Request, res: Response) => {
-  const healthInfo = {
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    cpu: os.loadavg(),
-    platform: process.platform,
-    version: process.version,
-  };
-
+export const getHealth = async (_req: Request, res: Response) => {
   try {
     await sql`SELECT 1`;
-    return successResponse(res, { ...healthInfo, database: 'connected' });
+    return res.status(200).json({ status: 'ok' });
   } catch (error) {
-    logger.error('[HEALTH] ✗ Advanced health check failed:', error);
-    return successResponse(res, { ...healthInfo, database: 'disconnected', error: 'DB_DOWN' });
+    logger.error('[HEALTH] Database readiness check failed', error);
+    return res.status(503).json({ status: 'unavailable' });
   }
 };
 

@@ -63,7 +63,7 @@ describe('syncMember with Neon Auth claims', () => {
     }));
   });
 
-  it('accepts an email supplied in the request body when the token has none', async () => {
+  it('rejects an email supplied in the request body when the token has none', async () => {
     const req = {
       auth: {
         userId: 'user_test_sync',
@@ -74,16 +74,18 @@ describe('syncMember with Neon Auth claims', () => {
       body: { email: 'body@example.com', fullName: 'Body User' },
     };
     const res = makeResponse();
-    (db.returning as any).mockResolvedValueOnce([makeMember({ email: 'body@example.com' })]);
 
     await syncMember(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(201);
-    expect(db.values).toHaveBeenCalledWith(expect.objectContaining({
-      email: 'body@example.com',
-      isEmailVerified: 0,
-      fullName: 'Body User',
-    }));
+    expect(res.status).toHaveBeenCalledWith(422);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: {
+        code: 'VALIDATION_FAILED',
+        message: 'User has no email address',
+      },
+    });
+    expect(db.values).not.toHaveBeenCalled();
   });
 
   it('returns 422 when neither the token nor body contains an email', async () => {
@@ -96,17 +98,21 @@ describe('syncMember with Neon Auth claims', () => {
     await syncMember(req, res);
 
     expect(res.status).toHaveBeenCalledWith(422);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+    expect(res.json).toHaveBeenCalledWith({
       success: false,
-      error: 'User has no email address',
-    }));
+      error: {
+        code: 'VALIDATION_FAILED',
+        message: 'User has no email address',
+      },
+    });
   });
 
   it('retries a transient database failure and succeeds', async () => {
     const member = makeMember();
-    (db.returning as any)
-      .mockRejectedValueOnce(new Error('Connection reset'))
-      .mockResolvedValueOnce([member]);
+    (db.select as any).mockImplementationOnce(() => {
+      throw new Error('Connection reset');
+    });
+    (db.returning as any).mockResolvedValueOnce([member]);
     const req = {
       auth: {
         userId: 'user_test_sync',
@@ -121,6 +127,7 @@ describe('syncMember with Neon Auth claims', () => {
     await syncMember(req, res);
 
     expect(res.status).toHaveBeenCalledWith(201);
-    expect(db.returning).toHaveBeenCalledTimes(2);
+    expect(db.select).toHaveBeenCalledTimes(2);
+    expect(db.returning).toHaveBeenCalledTimes(1);
   });
 });

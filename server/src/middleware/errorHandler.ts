@@ -1,27 +1,53 @@
-import { Request, Response, NextFunction } from 'express';
-import { errorResponse } from '../utils/responses';
+import type { ErrorRequestHandler } from 'express';
+import { failResponse } from '../utils/responses';
 import logger from '../utils/logger';
 
-export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
-  // Log to Winston
-  logger.error(`[ERROR] ${err.name}: ${err.message}`, {
-    stack: err.stack,
-    path: req.path,
+const isValidStatus = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 400 && value <= 599;
+
+const getRequestId = (req: any): string | undefined =>
+  typeof req.id === 'string' ? req.id : undefined;
+
+export const errorHandler: ErrorRequestHandler = (err, req, res, next) => {
+  if (res.headersSent) return next(err);
+
+  const requestId = getRequestId(req);
+  const status = isValidStatus(err?.statusCode)
+    ? err.statusCode
+    : isValidStatus(err?.status)
+      ? err.status
+      : 500;
+  const isOperational = err?.isOperational === true;
+  const publicCode = isOperational && typeof err?.code === 'string'
+    ? err.code
+    : status === 400
+      ? 'BAD_REQUEST'
+      : status === 401
+        ? 'UNAUTHORIZED'
+        : status === 403
+          ? 'FORBIDDEN'
+          : status === 404
+            ? 'NOT_FOUND'
+            : status === 409
+              ? 'CONFLICT'
+              : status === 422
+                ? 'VALIDATION_FAILED'
+                : status === 429
+                  ? 'RATE_LIMITED'
+                  : 'INTERNAL_ERROR';
+  const publicMessage = isOperational && typeof err?.publicMessage === 'string'
+    ? err.publicMessage
+    : status < 500
+      ? 'The request could not be completed.'
+      : 'An unexpected server error occurred.';
+
+  logger.error('Unhandled API error', {
+    err,
+    requestId,
     method: req.method,
-    ip: req.ip,
-    authUserId: (req as any).auth?.userId || (req as any).auth?.sub
+    path: req.originalUrl,
+    status,
   });
 
-  if (err.name === 'ZodError') {
-    return errorResponse(res, 'Validation failed', 400, err.errors);
-  }
-
-  if (err.status === 401 || err.name === 'UnauthorizedError') {
-    return errorResponse(res, 'Unauthorized', 401, err.message);
-  }
-
-  const status = err.status || 500;
-  const message = err.message || 'Internal server error';
-
-  return errorResponse(res, message, status, process.env.NODE_ENV === 'development' ? err : undefined);
+  return failResponse(res, status, publicCode, publicMessage, requestId);
 };

@@ -17,29 +17,18 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: [
-    {
-      command: 'npm run server',
-      url: 'http://localhost:3001/api/health',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120000,
-      env: {
-        NODE_ENV: 'development',
-        NEON_AUTH_URL: 'https://example.com/neondb/auth',
-        NEON_JWKS_URL: 'https://example.com/neondb/auth/.well-known/jwks.json',
-        DATABASE_URL: 'postgresql://127.0.0.1:5432/optizgym',
-        LOG_TO_FILE: 'false',
-      },
+  // The current e2e suite covers public frontend navigation only. API behavior,
+  // authentication, authorization, and persistence are covered by backend tests;
+  // keeping the browser server independent of PostgreSQL makes these checks
+  // deterministic in clean CI environments.
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:8080',
+    reuseExistingServer: !process.env.CI,
+    timeout: 120000,
+    env: {
+      VITE_NEON_AUTH_URL: 'https://example.com/neondb/auth',
+      VITE_API_URL: 'http://localhost:3001',
     },
-    {
-      command: 'npm run dev',
-      url: 'http://localhost:8080',
-      reuseExistingServer: !process.env.CI,
-      timeout: 120000,
-      env: {
-        VITE_NEON_AUTH_URL: 'https://example.com/neondb/auth',
-        VITE_API_URL: 'http://localhost:3001',
-      },
-    },
-  ],
+  },
 });

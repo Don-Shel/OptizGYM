@@ -81,25 +81,19 @@ export const profileSchema = z.object({
 });
 
 export const bookingSchema = z.object({
-  member_id: z.string().uuid(),
   class_id: z.string().uuid(),
 });
 
 export const paymentSchema = z.object({
-  member_id: z.string().uuid(),
-  amount: z.number().positive(),
-  currency: z.string().default('KES'),
-  plan: z.string(),
-  paystack_reference: z.string().optional(),
-  status: z.string().default('pending'),
-  paid_at: z.string().datetime().optional(),
+  plan: z.enum(['basic', 'pro', 'elite']),
+  billing: z.enum(memberBilling).default('monthly'),
+  paystack_reference: z.string().trim().max(200).optional(),
 });
 
 export const workoutSchema = z.object({
-  member_id: z.string().uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   exercises: z.array(z.any()),
   duration_minutes: z.number().int().positive().optional(),
   calories_burned: z.number().int().positive().optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
 });

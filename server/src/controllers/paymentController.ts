@@ -32,7 +32,7 @@ export const PLAN_PRICES = process.env.PAYMENT_TEST_MODE === 'true' || process.e
 
 const getPaystackSecret = () => {
   const secret = process.env.PAYSTACK_SECRET_KEY;
-  if (!secret) throw new PaymentError('Payment provider is not configured', 'provider_unavailable', 503);
+  if (!secret) throw new PaymentError('Payment provider is not configured', 'provider_unavailable', undefined, 503);
   return secret;
 };
 
@@ -47,7 +47,12 @@ const paystackRequest = async (path: string, init: RequestInit) => {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok || body.status !== true) {
-    throw new PaymentError(body.message || 'Payment provider request failed', 'provider_error', 502);
+    logger.warn('[PAYMENT] Paystack request failed', {
+      path,
+      status: response.status,
+      providerMessage: typeof body?.message === 'string' ? body.message : undefined,
+    });
+    throw new PaymentError('Payment provider request failed', 'provider_error', undefined, 502);
   }
   return body.data;
 };
@@ -175,9 +180,13 @@ export const getPaymentReceipt = async (req: any, res: Response, next: NextFunct
 
 /** Create a pending payment record. The record becomes paid only after webhook or provider verification. */
 export const createPayment = async (req: any, res: Response, next: NextFunction) => {
-  const { member_id: memberId, amount, currency, plan, paystack_reference: paystackReference } = req.body;
-  if (req.member?.id !== memberId) return errorResponse(res, 'Forbidden: You can only create payments for yourself', 403);
-  if (!memberId || !plan || !Number.isFinite(Number(amount)) || Number(amount) <= 0) return errorResponse(res, 'Invalid payment payload', 422);
+  const { plan, billing = 'monthly', paystack_reference: paystackReference } = req.body;
+  const memberId = req.member?.id;
+  const expectedAmount = PLAN_PRICES[plan]?.[billing];
+  if (!memberId) return errorResponse(res, 'Member profile not found', 404);
+  if (!['monthly', 'yearly'].includes(billing) || !expectedAmount || plan === 'free') {
+    return errorResponse(res, 'Invalid payment plan', 422);
+  }
 
   const correlationId = Math.random().toString(36).substring(7);
   try {
@@ -186,8 +195,8 @@ export const createPayment = async (req: any, res: Response, next: NextFunction)
 
     const [newPayment] = await db.insert(payments).values({
       memberId,
-      amount: Number(amount).toFixed(2),
-      currency: currency || 'KES',
+      amount: expectedAmount.toFixed(2),
+      currency: 'KES',
       plan,
       paystackReference: paystackReference || null,
       status: 'pending',
@@ -199,7 +208,7 @@ export const createPayment = async (req: any, res: Response, next: NextFunction)
       action: 'payment_initiated',
       entityType: 'payment',
       entityId: newPayment.id,
-      metadata: { amount, plan, reference: paystackReference, correlationId },
+      metadata: { amount: expectedAmount, plan, billing, reference: paystackReference, correlationId },
       req,
     });
 
@@ -211,9 +220,9 @@ export const createPayment = async (req: any, res: Response, next: NextFunction)
 };
 
 export const verifyPayment = async (req: any, res: Response, next: NextFunction) => {
-  const { reference, plan, billing = 'monthly', amount } = req.body;
+  const { reference } = req.body;
   if (!req.member) return errorResponse(res, 'Member profile not found', 404);
-  if (!reference || !['monthly', 'yearly'].includes(billing) || !PLAN_PRICES[plan]?.[billing]) {
+  if (typeof reference !== 'string' || reference.trim().length < 3 || reference.length > 200) {
     return errorResponse(res, 'Invalid payment verification payload', 422);
   }
 
@@ -222,49 +231,62 @@ export const verifyPayment = async (req: any, res: Response, next: NextFunction)
       method: 'GET',
     });
     if (providerPayment.status !== 'success') return errorResponse(res, 'Payment has not completed', 402);
-
-    const expectedAmount = PLAN_PRICES[plan][billing];
-    const paidAmount = Number(providerPayment.amount) / 100;
-    if (Math.abs(paidAmount - expectedAmount) > 0.01 || (amount && Math.abs(Number(amount) - expectedAmount) > 0.01)) {
-      return errorResponse(res, 'Payment amount does not match the selected plan', 400);
-    }
-    if (providerPayment.customer?.email && providerPayment.customer.email.toLowerCase() !== req.member.email.toLowerCase()) {
+    if (providerPayment.currency !== 'KES') return errorResponse(res, 'Payment currency is not supported', 400);
+    if (!providerPayment.customer?.email || providerPayment.customer.email.toLowerCase() !== req.member.email.toLowerCase()) {
       return errorResponse(res, 'Payment customer does not match the signed-in account', 403);
     }
 
-    const paidAt = providerPayment.paid_at ? new Date(providerPayment.paid_at) : new Date();
-    const [payment] = await db.insert(payments).values({
-      memberId: req.member.id,
-      amount: paidAmount.toFixed(2),
-      currency: providerPayment.currency || 'KES',
-      plan,
-      paystackReference: providerPayment.reference,
-      status: 'paid',
-      paidAt,
-      createdAt: new Date(),
-    }).onConflictDoUpdate({
-      target: payments.paystackReference,
-      set: { status: 'paid', paidAt, amount: paidAmount.toFixed(2), plan },
-    }).returning();
+    const paidAmount = Number(providerPayment.amount) / 100;
+    const result = await db.transaction(async (tx) => {
+      const [pending] = await tx.select()
+        .from(payments)
+        .where(and(
+          eq(payments.paystackReference, reference),
+          eq(payments.memberId, req.member.id),
+        ))
+        .for('update')
+        .limit(1);
 
-    const [member] = await db.update(members)
-      .set({ plan, planBilling: billing, membershipStatus: 'active', expiresAt: addBillingPeriod(billing), updatedAt: new Date() })
-      .where(eq(members.id, req.member.id))
-      .returning();
+      if (!pending) throw new PaymentError('Payment reference is not associated with this account', 'invalid_reference', undefined, 403);
+      if (pending.status === 'paid') return { payment: pending, member: req.member, alreadyPaid: true as const };
+      if (pending.status !== 'pending') throw new PaymentError('Payment is not pending', 'transaction_failed', undefined, 409);
 
-    await logActivity({
-      authUserId: req.auth.userId,
-      action: 'payment_verified',
-      entityType: 'payment',
-      entityId: payment.id,
-      metadata: { plan, billing, reference: providerPayment.reference },
-      req,
+      const billing = pending.billing === 'yearly' ? 'yearly' : 'monthly';
+      const expectedAmount = PLAN_PRICES[pending.plan]?.[billing];
+      if (!expectedAmount || Math.abs(paidAmount - expectedAmount) > 0.01) {
+        throw new PaymentError('Payment amount does not match the selected plan', 'amount_mismatch', undefined, 400);
+      }
+
+      const paidAt = providerPayment.paid_at ? new Date(providerPayment.paid_at) : new Date();
+      const [payment] = await tx.update(payments)
+        .set({ status: 'paid', paidAt, amount: paidAmount.toFixed(2), currency: 'KES' })
+        .where(and(eq(payments.id, pending.id), eq(payments.status, 'pending')))
+        .returning();
+      if (!payment) throw new PaymentError('Payment has already been processed', 'transaction_failed', undefined, 409);
+
+      const [member] = await tx.update(members)
+        .set({ plan: pending.plan as 'basic' | 'pro' | 'elite', planBilling: billing, membershipStatus: 'active', expiresAt: addBillingPeriod(billing), updatedAt: new Date() })
+        .where(eq(members.id, req.member.id))
+        .returning();
+      if (!member) throw new PaymentError('Member profile not found', 'transaction_failed', undefined, 404);
+      return { payment, member, billing, alreadyPaid: false as const };
     });
-    broadcastToMember(req.member.id, 'payment-success', { plan, status: 'paid' });
-    broadcastResourceChange('payments', 'created', payment.id);
-    broadcastResourceChange('members', 'activated', req.member.id);
 
-    return successResponse(res, { payment, member });
+    if (!result.alreadyPaid) {
+      await logActivity({
+        authUserId: req.auth.userId,
+        action: 'payment_verified',
+        entityType: 'payment',
+        entityId: result.payment.id,
+        metadata: { plan: result.payment.plan, billing: result.billing, reference: providerPayment.reference },
+        req,
+      });
+      broadcastToMember(req.member.id, 'payment-success', { plan: result.payment.plan, status: 'paid' });
+      broadcastResourceChange('payments', 'updated', result.payment.id);
+      broadcastResourceChange('members', 'activated', req.member.id);
+    }
+
+    return successResponse(res, { payment: result.payment, member: result.member });
   } catch (error) {
     if (error instanceof PaymentError) return errorResponse(res, error.message, error.status, { reason: error.reason });
     logger.error('[PAYMENT] Verification error', error);
@@ -279,6 +301,7 @@ export const retryPayment = async (req: any, res: Response, next: NextFunction) 
       amount: payments.amount,
       currency: payments.currency,
       plan: payments.plan,
+      billing: payments.billing,
       status: payments.status,
       memberId: payments.memberId,
       memberEmail: members.email,
@@ -286,16 +309,19 @@ export const retryPayment = async (req: any, res: Response, next: NextFunction) 
 
     if (!payment || !payment.memberEmail) return errorResponse(res, 'Payment or member not found', 404);
     if (payment.status === 'paid') return errorResponse(res, 'Paid payments cannot be retried', 409);
+    const billing = payment.billing === 'yearly' ? 'yearly' : 'monthly';
+    const expectedAmount = PLAN_PRICES[payment.plan]?.[billing];
+    if (!expectedAmount) return errorResponse(res, 'Payment plan is not supported', 422);
 
     const reference = `optizgym-${payment.id}-${Date.now()}`;
     const providerPayment = await paystackRequest('/transaction/initialize', {
       method: 'POST',
       body: JSON.stringify({
         email: payment.memberEmail,
-        amount: String(Math.round(Number(payment.amount) * 100)),
-        currency: payment.currency || 'KES',
+        amount: String(Math.round(expectedAmount * 100)),
+        currency: 'KES',
         reference,
-        metadata: JSON.stringify({ paymentId: payment.id, memberId: payment.memberId, plan: payment.plan, retry: true }),
+        metadata: JSON.stringify({ paymentId: payment.id, memberId: payment.memberId, plan: payment.plan, billing, retry: true }),
         channels: ['card', 'mobile_money', 'bank_transfer', 'bank', 'ussd', 'qr'],
       }),
     });

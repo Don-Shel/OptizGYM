@@ -38,11 +38,11 @@ export const getBookingsByMemberId = async (req: Request, res: Response, next: N
  * Atomic Class Booking with Integrated Eligibility & Availability Checks
  */
 export const createBooking = async (req: any, res: Response, next: NextFunction) => {
-  const { member_id: memberId, class_id: classId } = req.body;
+  const { class_id: classId } = req.body;
+  const memberId = req.member?.id;
 
-  // RBAC: Ensure member is booking for themselves
-  if (req.member?.id !== memberId) {
-    return errorResponse(res, 'Forbidden: You can only book for yourself', 403);
+  if (!memberId) {
+    return errorResponse(res, 'Member profile not found', 404);
   }
 
   const correlationId = Math.random().toString(36).substring(7);

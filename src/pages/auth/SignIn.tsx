@@ -39,11 +39,8 @@ const SignIn = () => {
       await refreshUser();
       toast.success("Signed in successfully.");
       navigate("/dashboard", { replace: true });
-    } catch (error) {
-      const message = error instanceof Error
-        ? error.message
-        : "Sign-in failed. Check your email and password and try again.";
-      toast.error(message);
+    } catch {
+      toast.error("Sign-in failed. Check your email and password and try again.");
     } finally {
       setIsSubmitting(false);
     }

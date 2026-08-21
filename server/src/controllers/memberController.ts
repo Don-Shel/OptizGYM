@@ -20,9 +20,7 @@ export const syncMember = async (req: any, res: Response) => {
       const email = String(req.auth.email || '').trim().toLowerCase();
       const fullName = String(req.auth.name || '').trim() || null;
 
-      const effectiveEmail = email || req.body.email;
-
-      if (!effectiveEmail) {
+      if (!email) {
         console.error(`[SYNC] ✗ Auth user ${authUserId} has no email address`);
         return errorResponse(res, 'User has no email address', 422);
       }
@@ -41,7 +39,7 @@ export const syncMember = async (req: any, res: Response) => {
         const [updatedMember] = await db
           .update(members)
           .set({
-            email: effectiveEmail.trim().toLowerCase(),
+            email,
             fullName: fullName || existingMember.fullName,
             isEmailVerified,
             updatedAt: new Date()
@@ -56,10 +54,10 @@ export const syncMember = async (req: any, res: Response) => {
 
         const [newMember] = await db.insert(members).values({
           authUserId,
-          email: effectiveEmail,
-          isEmailVerified: isEmailVerified,
-          fullName: fullName || req.body.fullName || null,
-          phone: req.body.phone || null,
+          email,
+          isEmailVerified,
+          fullName,
+          phone: null,
           role: 'member',
           plan: 'free',
           planBilling: 'monthly',
@@ -164,7 +162,10 @@ export const updateMyProfile = async (req: any, res: Response) => {
 export const createMember = async (req: any, res: Response) => {
   try {
     const authId = req.auth.userId;
+    const email = String(req.auth.email || '').trim().toLowerCase();
+    const fullName = String(req.auth.name || '').trim() || null;
     const isEmailVerified = req.auth.email_verified === true ? 1 : 0;
+    if (!email) return errorResponse(res, 'User email is required to create a profile', 422);
 
     // Check if already exists
     const [existing] = await db.select().from(members).where(
@@ -177,10 +178,10 @@ export const createMember = async (req: any, res: Response) => {
 
     const [newMember] = await db.insert(members).values({
       authUserId: authId,
-      email: req.body.email,
+      email,
       isEmailVerified,
-      fullName: req.body.fullName,
-      phone: req.body.phone,
+      fullName,
+      phone: req.body.phone ? String(req.body.phone).trim() : null,
       role: 'member',
       plan: 'free',
       planBilling: 'monthly',
