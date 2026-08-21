@@ -19,6 +19,7 @@ const Pricing = lazy(() => import("./pages/Pricing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Forbidden = lazy(() => import("./pages/Forbidden"));
 const ServerError = lazy(() => import("./pages/ServerError"));
+const InformationPage = lazy(() => import("./pages/InformationPage"));
 
 // Auth pages
 const SignIn = lazy(() => import("./pages/auth/SignIn"));
@@ -117,6 +118,15 @@ const AppRoutes = () => (
       <Route path="/classes" element={<Classes />} />
       <Route path="/trainers" element={<Trainers />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/about" element={<InformationPage slug="about" />} />
+      <Route path="/careers" element={<InformationPage slug="careers" />} />
+      <Route path="/press" element={<InformationPage slug="press" />} />
+      <Route path="/blog" element={<InformationPage slug="blog" />} />
+      <Route path="/contact" element={<InformationPage slug="contact" />} />
+      <Route path="/terms" element={<InformationPage slug="terms" />} />
+      <Route path="/privacy" element={<InformationPage slug="privacy" />} />
+      <Route path="/faqs" element={<InformationPage slug="faqs" />} />
+      <Route path="/cookies" element={<InformationPage slug="cookies" />} />
 
       <Route path="/auth/sign-in/*" element={<AuthRoute><SignIn /></AuthRoute>} />
       <Route path="/auth/sign-up/*" element={<AuthRoute><SignUp /></AuthRoute>} />

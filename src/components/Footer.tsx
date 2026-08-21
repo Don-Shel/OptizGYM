@@ -19,50 +19,64 @@ const Footer = () => (
         {/* Company */}
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-foreground">Company</h4>
-          <div className="flex flex-col gap-2.5">
-            {["About Us", "Careers", "Press", "Blog"].map((item) => (
-              <span key={item} className="text-sm text-muted-foreground hover:text-primary cursor-pointer transition-colors">{item}</span>
+          <nav aria-label="Company links" className="flex flex-col gap-2.5">
+            {[
+              ["About Us", "/about"],
+              ["Careers", "/careers"],
+              ["Press", "/press"],
+              ["Blog", "/blog"],
+            ].map(([label, to]) => (
+              <Link key={to} to={to} className="text-sm text-muted-foreground transition-colors hover:text-primary">{label}</Link>
             ))}
-          </div>
+          </nav>
         </div>
 
         {/* Support */}
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-foreground">Support</h4>
-          <div className="flex flex-col gap-2.5">
-            {["Contact Center", "Terms of Service", "Privacy Policy", "FAQs"].map((item) => (
-              <span key={item} className="text-sm text-muted-foreground hover:text-primary cursor-pointer transition-colors">{item}</span>
+          <nav aria-label="Support links" className="flex flex-col gap-2.5">
+            {[
+              ["Contact Center", "/contact"],
+              ["Terms of Service", "/terms"],
+              ["Privacy Policy", "/privacy"],
+              ["FAQs", "/faqs"],
+            ].map(([label, to]) => (
+              <Link key={to} to={to} className="text-sm text-muted-foreground transition-colors hover:text-primary">{label}</Link>
             ))}
-          </div>
+          </nav>
         </div>
 
         {/* Contact */}
         <div className="space-y-4">
           <h4 className="text-sm font-semibold text-foreground">Contact Us</h4>
           <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <MapPin className="h-4 w-4 mt-0.5 text-primary" />
-              <span className="text-sm text-muted-foreground">123 Fitness Blvd, Muscle City, CA 90210</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">+1 (555) 123-4567</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-primary" />
-              <span className="text-sm text-muted-foreground">hello@optizgym.com</span>
-            </div>
+            <a className="flex items-start gap-2 text-sm text-muted-foreground transition-colors hover:text-primary" href="https://www.google.com/maps/search/?api=1&query=123+Fitness+Blvd+Muscle+City+CA+90210" target="_blank" rel="noreferrer">
+              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <span>123 Fitness Blvd, Muscle City, CA 90210</span>
+            </a>
+            <a className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary" href="tel:+15551234567">
+              <Phone className="h-4 w-4 shrink-0 text-primary" />
+              <span>+1 (555) 123-4567</span>
+            </a>
+            <a className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary" href="mailto:hello@optizgym.com">
+              <Mail className="h-4 w-4 shrink-0 text-primary" />
+              <span>hello@optizgym.com</span>
+            </a>
           </div>
         </div>
       </div>
 
       <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 md:flex-row">
         <p className="text-xs text-muted-foreground">© 2026 OptizGYM. All rights reserved.</p>
-        <div className="flex gap-6">
-          {["Privacy", "Terms", "Cookies"].map((item) => (
-            <span key={item} className="text-xs text-muted-foreground hover:text-primary cursor-pointer transition-colors">{item}</span>
+        <nav aria-label="Legal links" className="flex gap-6">
+          {[
+            ["Privacy", "/privacy"],
+            ["Terms", "/terms"],
+            ["Cookies", "/cookies"],
+          ].map(([label, to]) => (
+            <Link key={to} to={to} className="text-xs text-muted-foreground transition-colors hover:text-primary">{label}</Link>
           ))}
-        </div>
+        </nav>
       </div>
     </div>
   </footer>

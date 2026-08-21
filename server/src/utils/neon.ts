@@ -6,8 +6,8 @@ dotenv.config();
 
 export const neonAuthUrl = process.env.NEON_AUTH_URL;
 export const neonJwksUrl = process.env.NEON_JWKS_URL;
-const neonAuthIssuer = process.env.NEON_AUTH_ISSUER;
-const neonAuthAudience = process.env.NEON_AUTH_AUDIENCE;
+const neonAuthIssuerConfig = process.env.NEON_AUTH_ISSUER?.trim();
+const neonAuthAudienceConfig = process.env.NEON_AUTH_AUDIENCE?.trim();
 
 if (!neonAuthUrl || !neonJwksUrl) {
   throw new Error(
@@ -15,9 +15,27 @@ if (!neonAuthUrl || !neonJwksUrl) {
   );
 }
 
-if (process.env.NODE_ENV === 'production' && (!neonAuthIssuer || !neonAuthAudience)) {
+if (process.env.NODE_ENV === 'production' && (!neonAuthIssuerConfig || !neonAuthAudienceConfig)) {
   throw new Error('[AUTH] NEON_AUTH_ISSUER and NEON_AUTH_AUDIENCE are required in production.');
 }
+
+const normalizeAuthOrigin = (value: string, variableName: string) => {
+  try {
+    const parsed = new URL(value);
+    if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+      throw new Error(`${variableName} must use HTTPS in production.`);
+    }
+    return parsed.origin;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('must use HTTPS')) throw error;
+    throw new Error(`${variableName} must be a valid Auth URL.`);
+  }
+};
+
+// Neon Auth JWT `iss` and `aud` claims use the Auth URL origin. Normalize
+// operator-provided values so a copied `/neondb/auth` path cannot cause 401s.
+const neonAuthIssuer = neonAuthIssuerConfig ? normalizeAuthOrigin(neonAuthIssuerConfig, 'NEON_AUTH_ISSUER') : undefined;
+const neonAuthAudience = neonAuthAudienceConfig ? normalizeAuthOrigin(neonAuthAudienceConfig, 'NEON_AUTH_AUDIENCE') : undefined;
 
 const JWKS = jose.createRemoteJWKSet(new URL(neonJwksUrl));
 const webhookMaxAgeMs = Number(process.env.NEON_WEBHOOK_MAX_AGE_MS ?? 5 * 60 * 1000);
