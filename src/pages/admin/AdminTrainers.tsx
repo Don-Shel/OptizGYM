@@ -8,6 +8,8 @@ import {
   Search,
   Trash2,
   Users,
+  ChevronDown,
+  ChevronUp,
   X,
   Loader2,
 } from 'lucide-react';
@@ -67,6 +69,7 @@ const AdminTrainers = () => {
   const [editingTrainer, setEditingTrainer] = useState<Trainer | null>(null);
   const [form, setForm] = useState<TrainerForm>(EMPTY_FORM);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const filteredTrainers = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -209,38 +212,48 @@ const AdminTrainers = () => {
           {!search && <button onClick={openCreate} className="mt-5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Add first trainer</button>}
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredTrainers.map((trainer, index) => (
-            <motion.article
-              key={trainer.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.04 }}
-              className="group overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg"
-            >
-              <div className="relative flex h-32 items-center gap-4 overflow-hidden bg-gradient-to-br from-primary/20 via-cyan-500/10 to-transparent px-5">
-                <div className="absolute -right-8 -top-12 h-36 w-36 rounded-full border border-white/10" />
-                {trainer.avatarUrl ? (
-                  <img src={trainer.avatarUrl} alt={trainer.fullName} className="relative h-20 w-20 rounded-full border-4 border-background/70 object-cover shadow-xl" />
-                ) : (
-                  <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-background/70 bg-background/80 text-xl font-bold text-primary shadow-xl">{initials(trainer.fullName)}</div>
-                )}
-                <div className="relative min-w-0">
-                  <h2 className="truncate text-lg font-bold text-foreground">{trainer.fullName}</h2>
-                  <p className="mt-1 truncate text-sm font-semibold text-primary">{trainer.specialty || 'Performance coach'}</p>
-                </div>
-              </div>
-              <div className="p-5">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground"><Mail className="h-3.5 w-3.5" /><span className="truncate">{trainer.email}</span></div>
-                <p className="mt-4 min-h-12 text-sm leading-6 text-muted-foreground">{trainer.bio || 'No public bio added yet.'}</p>
-                <div className="mt-5 flex gap-2 border-t border-border/70 pt-4">
-                  <button onClick={() => openEdit(trainer)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground transition hover:bg-accent"><Edit3 className="h-3.5 w-3.5" /> Edit</button>
-                  <button onClick={() => setDeleteId(trainer.id)} className="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/25 px-3 py-2 text-xs font-semibold text-destructive transition hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Remove</button>
-                </div>
-              </div>
-            </motion.article>
-          ))}
-        </div>
+        <section className="overflow-hidden rounded-2xl border border-border bg-card px-5">
+          <div className="hidden border-b border-border/60 py-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(220px,1fr)_minmax(230px,1fr)] lg:items-center lg:gap-4">
+            <span>Trainer</span><span>Contact</span><span className="text-right">Actions</span>
+          </div>
+          <div className="divide-y divide-border/60">
+            {filteredTrainers.map((trainer, index) => {
+              const isExpanded = expandedId === trainer.id;
+              return (
+                <motion.article key={trainer.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }}>
+                  <div className="flex flex-col gap-4 py-4 lg:grid lg:grid-cols-[minmax(0,1.6fr)_minmax(220px,1fr)_minmax(230px,1fr)] lg:items-center lg:gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {trainer.avatarUrl ? (
+                        <img src={trainer.avatarUrl} alt={trainer.fullName} className="h-12 w-12 shrink-0 rounded-full border-2 border-primary/20 object-cover" />
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">{initials(trainer.fullName)}</div>
+                      )}
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-semibold text-foreground">{trainer.fullName}</h2>
+                        <p className="truncate text-xs font-semibold text-primary">{trainer.specialty || 'Performance coach'}</p>
+                      </div>
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground"><Mail className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{trainer.email}</span></div>
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      <button onClick={() => setExpandedId(isExpanded ? null : trainer.id)} aria-expanded={isExpanded} className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-2 text-[11px] font-semibold text-foreground transition hover:border-primary/40 hover:text-primary">{isExpanded ? 'Hide details' : 'View details'}{isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}</button>
+                      <button onClick={() => openEdit(trainer)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-[11px] font-semibold text-foreground transition hover:bg-accent"><Edit3 className="h-3.5 w-3.5" /> Edit</button>
+                      <button onClick={() => setDeleteId(trainer.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/25 px-2.5 py-2 text-[11px] font-semibold text-destructive transition hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Remove</button>
+                    </div>
+                  </div>
+                  {isExpanded && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="overflow-hidden">
+                      <div className="mb-4 grid gap-5 rounded-xl bg-background/60 p-4 sm:grid-cols-2">
+                        <div><p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Email</p><p className="mt-1 break-all text-sm text-foreground">{trainer.email}</p></div>
+                        <div><p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Specialty</p><p className="mt-1 text-sm text-foreground">{trainer.specialty || 'Performance coach'}</p></div>
+                        <div className="sm:col-span-2"><p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Public bio</p><p className="mt-1 text-sm leading-6 text-muted-foreground">{trainer.bio || 'No public bio added yet.'}</p></div>
+                      </div>
+                    </motion.div>
+                  )}
+                </motion.article>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       <Dialog open={editorOpen} onOpenChange={(open) => !open && closeEditor()}>

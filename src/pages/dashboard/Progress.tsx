@@ -47,6 +47,28 @@ const TYPE_COLORS: Record<string, string> = {
   default: "bg-muted text-muted-foreground",
 };
 
+const numericWorkoutValue = (...values: unknown[]) => {
+  const value = values.find((candidate) => candidate !== null && candidate !== undefined && candidate !== "");
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const workoutName = (log: any) => String(
+  log.name ?? log.type ?? log.workoutName ?? log.workout_name ?? "Workout session",
+);
+
+const workoutDuration = (log: any) => numericWorkoutValue(
+  log.durationMinutes,
+  log.duration_minutes,
+  log.duration,
+);
+
+const workoutCalories = (log: any) => numericWorkoutValue(
+  log.caloriesBurned,
+  log.calories_burned,
+  log.calories,
+);
+
 const Progress = () => {
   const { user } = useAuth();
   const { useMemberWorkouts, useCreateWorkout } = useWorkouts();
@@ -69,8 +91,8 @@ const Progress = () => {
       const dayLogs = logs.filter((log: any) => String(log.date).slice(0, 10) === key);
       return {
         day: day.toLocaleDateString(undefined, { weekday: 'short' }),
-        calories: dayLogs.reduce((total: number, log: any) => total + Number(log.caloriesBurned ?? log.calories_burned ?? 0), 0),
-        duration: dayLogs.reduce((total: number, log: any) => total + Number(log.durationMinutes ?? log.duration_minutes ?? 0), 0),
+        calories: dayLogs.reduce((total: number, log: any) => total + workoutCalories(log), 0),
+        duration: dayLogs.reduce((total: number, log: any) => total + workoutDuration(log), 0),
       };
     });
   }, [logs]);
@@ -83,13 +105,13 @@ const Progress = () => {
       if (date.getFullYear() !== month.getFullYear() || date.getMonth() !== month.getMonth()) return;
       const weekIndex = Math.min(4, Math.floor((date.getDate() - 1) / 7));
       weeks[weekIndex].workouts += 1;
-      weeks[weekIndex].calories += Number(log.caloriesBurned ?? log.calories_burned ?? 0);
+      weeks[weekIndex].calories += workoutCalories(log);
     });
     return weeks;
   }, [logs]);
 
-  const totalCalories = logs.reduce((s: number, w: any) => s + (w.caloriesBurned || w.calories_burned || w.calories || 0), 0);
-  const totalMinutes = logs.reduce((s: number, w: any) => s + (w.durationMinutes || w.duration_minutes || w.duration || 0), 0);
+  const totalCalories = logs.reduce((s: number, w: any) => s + workoutCalories(w), 0);
+  const totalMinutes = logs.reduce((s: number, w: any) => s + workoutDuration(w), 0);
   const avgCalories = logs.length > 0 ? Math.round(totalCalories / logs.length) : 0;
 
   const handleAddLog = () => {
@@ -217,17 +239,17 @@ const Progress = () => {
                 <div className="p-4 cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => setExpanded(expanded === log.id ? null : log.id)}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-semibold text-foreground">{log.type}</span>
-                      <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider", TYPE_COLORS[log.type] || TYPE_COLORS.default)}>
-                        {log.type}
+                      <span className="text-sm font-semibold text-foreground">{workoutName(log)}</span>
+                      <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider", TYPE_COLORS[workoutName(log)] || TYPE_COLORS.default)}>
+                        {workoutName(log)}
                       </span>
                     </div>
                     {expanded === log.id ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(log.date).toLocaleDateString()}</span>
-                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {log.duration_minutes || log.duration} min</span>
-                    <span className="flex items-center gap-1"><Flame className="h-3 w-3 text-orange-400" /> {log.calories_burned || log.calories} kcal</span>
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> <strong className="font-semibold text-foreground">{workoutDuration(log)} min</strong> time taken</span>
+                    <span className="flex items-center gap-1"><Flame className="h-3 w-3 text-orange-400" /> <strong className="font-semibold text-foreground">{workoutCalories(log).toLocaleString()} kcal</strong> burned</span>
                   </div>
                 </div>
                 <AnimatePresence>

@@ -18,6 +18,16 @@ const PLAN_COLORS: Record<string, string> = {
   elite: "text-cyan-400 border-cyan-400/40",
 };
 
+const workoutLabel = (workout: any) => String(
+  workout.name ?? workout.type ?? workout.workoutName ?? workout.workout_name ?? workout.notes ?? "Workout session",
+);
+
+const workoutNumber = (workout: any, ...keys: string[]) => {
+  const value = keys.map((key) => workout[key]).find((candidate) => candidate !== null && candidate !== undefined && candidate !== "");
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const MemberDashboard = () => {
   const { user } = useAuth();
   const { useMemberBookings } = useBookings();
@@ -39,11 +49,14 @@ const MemberDashboard = () => {
     .sort((a: any, b: any) => new Date(a.schedule).getTime() - new Date(b.schedule).getTime())
     .slice(0, 3);
   const recentWorkouts = workouts.slice(0, 3);
+  const bookedClasses = bookings
+    .filter((booking: any) => booking.status === 'confirmed')
+    .sort((a: any, b: any) => new Date(a.schedule).getTime() - new Date(b.schedule).getTime());
   const lastPayment = payments[0] || { plan: "No plan", amount: 0, createdAt: null, created_at: null, paystackReference: "-", paystack_reference: "-" };
 
-  const totalCalories = workouts.reduce((s: number, w: any) => s + (w.caloriesBurned || w.calories_burned || 0), 0);
+  const totalCalories = workouts.reduce((s: number, w: any) => s + workoutNumber(w, 'caloriesBurned', 'calories_burned', 'calories'), 0);
   const totalWorkouts = workouts.length;
-  const totalMinutes = workouts.reduce((s: number, w: any) => s + (w.durationMinutes || w.duration_minutes || 0), 0);
+  const totalMinutes = workouts.reduce((s: number, w: any) => s + workoutNumber(w, 'durationMinutes', 'duration_minutes', 'duration'), 0);
 
   return (
     <DashboardLayout title={`Welcome back, ${user?.fullName?.split(" ")[0]}!`} subtitle="Here's your fitness overview">
@@ -165,12 +178,12 @@ const MemberDashboard = () => {
                     <CheckCircle className="h-3.5 w-3.5 text-primary" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground">{w.notes || "Strength Training"}</p>
+                    <p className="text-xs font-medium text-foreground">{workoutLabel(w)}</p>
                     <p className="text-xs text-muted-foreground">{new Date(w.date).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-medium text-foreground">{w.durationMinutes ?? w.duration_minutes}m</p>
-                    <p className="text-xs text-muted-foreground">{w.caloriesBurned ?? w.calories_burned} cal</p>
+                    <p className="text-xs font-medium text-foreground">{workoutNumber(w, 'durationMinutes', 'duration_minutes', 'duration')}m</p>
+                    <p className="text-xs text-muted-foreground">{workoutNumber(w, 'caloriesBurned', 'calories_burned', 'calories').toLocaleString()} cal</p>
                   </div>
                 </div>
               ))}
@@ -181,6 +194,32 @@ const MemberDashboard = () => {
           </motion.div>
         </div>
       </div>
+
+      <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+        className="mt-6 rounded-xl border border-border bg-card p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">All Booked Classes</h2>
+            <p className="text-xs text-muted-foreground">{bookedClasses.length} confirmed {bookedClasses.length === 1 ? 'booking' : 'bookings'}</p>
+          </div>
+          <Link to="/dashboard/classes" className="flex items-center gap-1 text-xs text-primary hover:underline">Manage bookings <ArrowRight className="h-3 w-3" /></Link>
+        </div>
+        <div className="space-y-2">
+          {bookedClasses.length > 0 ? bookedClasses.map((booking: any) => (
+            <div key={booking.id} className="flex flex-col gap-3 border-b border-border/60 py-3 last:border-0 last:pb-0 sm:flex-row sm:items-center">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10"><Dumbbell className="h-4 w-4 text-primary" /></div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{booking.className || booking.name || 'Booked class'}</p>
+                <p className="text-xs text-muted-foreground">{booking.instructor || 'Staff'} · {booking.durationMinutes ?? booking.duration_minutes ?? '—'} min</p>
+              </div>
+              <div className="text-left sm:text-right">
+                <p className="text-xs font-medium text-foreground">{booking.schedule ? new Date(booking.schedule).toLocaleDateString() : 'Schedule pending'}</p>
+                <p className="text-[10px] text-muted-foreground">{booking.schedule ? new Date(booking.schedule).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</p>
+              </div>
+            </div>
+          )) : <p className="py-5 text-center text-xs text-muted-foreground">You have no confirmed bookings yet.</p>}
+        </div>
+      </motion.section>
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
         className="mt-6 rounded-xl border border-border bg-card p-5 flex items-center justify-between">
